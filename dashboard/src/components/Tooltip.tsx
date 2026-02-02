@@ -108,23 +108,37 @@ interface TooltipPortalProps {
 
 function getTransformOrigin(position: TooltipPosition) {
   switch (position) {
-    case 'top': return 'bottom center'
-    case 'bottom': return 'top center'
-    case 'left': return 'center right'
-    case 'right': return 'center left'
+    case 'top':
+      return 'bottom center'
+    case 'bottom':
+      return 'top center'
+    case 'left':
+      return 'center right'
+    case 'right':
+      return 'center left'
   }
 }
 
 function getTransform(position: TooltipPosition) {
   switch (position) {
-    case 'top': return 'translateX(-50%) translateY(-100%)'
-    case 'bottom': return 'translateX(-50%)'
-    case 'left': return 'translateY(-50%) translateX(-100%)'
-    case 'right': return 'translateY(-50%)'
+    case 'top':
+      return 'translateX(-50%) translateY(-100%)'
+    case 'bottom':
+      return 'translateX(-50%)'
+    case 'left':
+      return 'translateY(-50%) translateX(-100%)'
+    case 'right':
+      return 'translateY(-50%)'
   }
 }
 
-export function TooltipPortal({ isVisible, coords, position, content, className = '' }: TooltipPortalProps) {
+export function TooltipPortal({
+  isVisible,
+  coords,
+  position,
+  content,
+  className = '',
+}: TooltipPortalProps) {
   return createPortal(
     <AnimatePresence>
       {isVisible && (
@@ -164,22 +178,18 @@ interface TooltipProps {
   className?: string
 }
 
-export function Tooltip({ 
-  children, 
-  content, 
+export function Tooltip({
+  children,
+  content,
   position = 'top',
   delay = 200,
-  className = ''
+  className = '',
 }: TooltipProps) {
   const { triggerRef, triggerProps, tooltipProps } = useTooltip<HTMLDivElement>({ position, delay })
 
   return (
     <>
-      <div
-        ref={triggerRef}
-        {...triggerProps}
-        className="inline-block"
-      >
+      <div ref={triggerRef} {...triggerProps} className="inline-block">
         {children}
       </div>
       <TooltipPortal {...tooltipProps} content={content} className={className} />
@@ -197,11 +207,9 @@ export function TooltipContent({ title, items, description }: TooltipContentProp
   return (
     <div className="space-y-2">
       {title && (
-        <div className="hud-label text-hud-primary border-b border-hud-line/50 pb-1">
-          {title}
-        </div>
+        <div className="hud-label text-hud-primary border-b border-hud-line/50 pb-1">{title}</div>
       )}
-      
+
       {items && items.length > 0 && (
         <div className="space-y-1">
           {items.map((item, i) => (
@@ -212,12 +220,8 @@ export function TooltipContent({ title, items, description }: TooltipContentProp
           ))}
         </div>
       )}
-      
-      {description && (
-        <p className="text-hud-text-dim text-[10px] leading-tight">
-          {description}
-        </p>
-      )}
+
+      {description && <p className="text-hud-text-dim text-[10px] leading-tight">{description}</p>}
     </div>
   )
 }

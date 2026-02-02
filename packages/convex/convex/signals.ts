@@ -1,5 +1,5 @@
-import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
+import { mutation, query } from './_generated/server'
 
 export const getTop = query({
   args: {
@@ -24,10 +24,7 @@ export const getCrypto = query({
     return await ctx.db
       .query('signals')
       .filter((q) =>
-        q.and(
-          q.eq(q.field('isCrypto'), true),
-          q.gte(q.field('momentum'), args.minMomentum)
-        )
+        q.and(q.eq(q.field('isCrypto'), true), q.gte(q.field('momentum'), args.minMomentum))
       )
       .order('desc')
       .take(10)

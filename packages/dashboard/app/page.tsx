@@ -1,5 +1,7 @@
-import { Panel } from '@/components/Panel'
+'use client'
+
 import { Metric } from '@/components/Metric'
+import { Panel } from '@/components/Panel'
 import { SettingsModal } from '@/components/SettingsModal'
 import { useState } from 'react'
 
@@ -20,10 +22,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">MAHORAGA</h1>
           <p className="text-gray-500">Autonomous Trading Agent</p>
         </div>
-        <button 
-          onClick={() => setShowSettings(true)}
-          className="btn-primary"
-        >
+        <button type="button" onClick={() => setShowSettings(true)} className="btn-primary">
           Settings
         </button>
       </header>

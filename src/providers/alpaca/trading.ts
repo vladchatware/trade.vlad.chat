@@ -1,4 +1,4 @@
-import type { AlpacaClient } from "./client";
+import type { AlpacaClient } from './client'
 import type {
   Account,
   Position,
@@ -8,65 +8,65 @@ import type {
   MarketClock,
   MarketDay,
   BrokerProvider,
-} from "../types";
+} from '../types'
 
 interface AlpacaAccount {
-  id: string;
-  account_number: string;
-  status: string;
-  currency: string;
-  cash: string;
-  buying_power: string;
-  regt_buying_power: string;
-  daytrading_buying_power: string;
-  equity: string;
-  last_equity: string;
-  long_market_value: string;
-  short_market_value: string;
-  portfolio_value: string;
-  pattern_day_trader: boolean;
-  trading_blocked: boolean;
-  transfers_blocked: boolean;
-  account_blocked: boolean;
-  multiplier: string;
-  shorting_enabled: boolean;
-  maintenance_margin: string;
-  initial_margin: string;
-  daytrade_count: number;
-  created_at: string;
+  id: string
+  account_number: string
+  status: string
+  currency: string
+  cash: string
+  buying_power: string
+  regt_buying_power: string
+  daytrading_buying_power: string
+  equity: string
+  last_equity: string
+  long_market_value: string
+  short_market_value: string
+  portfolio_value: string
+  pattern_day_trader: boolean
+  trading_blocked: boolean
+  transfers_blocked: boolean
+  account_blocked: boolean
+  multiplier: string
+  shorting_enabled: boolean
+  maintenance_margin: string
+  initial_margin: string
+  daytrade_count: number
+  created_at: string
 }
 
 interface AlpacaPosition {
-  asset_id: string;
-  symbol: string;
-  exchange: string;
-  asset_class: string;
-  avg_entry_price: string;
-  qty: string;
-  side: string;
-  market_value: string;
-  cost_basis: string;
-  unrealized_pl: string;
-  unrealized_plpc: string;
-  unrealized_intraday_pl: string;
-  unrealized_intraday_plpc: string;
-  current_price: string;
-  lastday_price: string;
-  change_today: string;
+  asset_id: string
+  symbol: string
+  exchange: string
+  asset_class: string
+  avg_entry_price: string
+  qty: string
+  side: string
+  market_value: string
+  cost_basis: string
+  unrealized_pl: string
+  unrealized_plpc: string
+  unrealized_intraday_pl: string
+  unrealized_intraday_plpc: string
+  current_price: string
+  lastday_price: string
+  change_today: string
 }
 
 interface AlpacaClock {
-  timestamp: string;
-  is_open: boolean;
-  next_open: string;
-  next_close: string;
+  timestamp: string
+  is_open: boolean
+  next_open: string
+  next_close: string
 }
 
 interface AlpacaCalendarDay {
-  date: string;
-  open: string;
-  close: string;
-  settlement_date: string;
+  date: string
+  open: string
+  close: string
+  settlement_date: string
 }
 
 function parseAccount(raw: AlpacaAccount): Account {
@@ -94,7 +94,7 @@ function parseAccount(raw: AlpacaAccount): Account {
     initial_margin: parseFloat(raw.initial_margin),
     daytrade_count: raw.daytrade_count,
     created_at: raw.created_at,
-  };
+  }
 }
 
 function parsePosition(raw: AlpacaPosition): Position {
@@ -105,7 +105,7 @@ function parsePosition(raw: AlpacaPosition): Position {
     asset_class: raw.asset_class,
     avg_entry_price: parseFloat(raw.avg_entry_price),
     qty: parseFloat(raw.qty),
-    side: raw.side as "long" | "short",
+    side: raw.side as 'long' | 'short',
     market_value: parseFloat(raw.market_value),
     cost_basis: parseFloat(raw.cost_basis),
     unrealized_pl: parseFloat(raw.unrealized_pl),
@@ -115,57 +115,53 @@ function parsePosition(raw: AlpacaPosition): Position {
     current_price: parseFloat(raw.current_price),
     lastday_price: parseFloat(raw.lastday_price),
     change_today: parseFloat(raw.change_today),
-  };
+  }
 }
 
 export class AlpacaTradingProvider implements BrokerProvider {
   constructor(private client: AlpacaClient) {}
 
   async getAccount(): Promise<Account> {
-    const raw = await this.client.tradingRequest<AlpacaAccount>("GET", "/v2/account");
-    return parseAccount(raw);
+    const raw = await this.client.tradingRequest<AlpacaAccount>('GET', '/v2/account')
+    return parseAccount(raw)
   }
 
   async getPositions(): Promise<Position[]> {
-    const raw = await this.client.tradingRequest<AlpacaPosition[]>("GET", "/v2/positions");
-    return raw.map(parsePosition);
+    const raw = await this.client.tradingRequest<AlpacaPosition[]>('GET', '/v2/positions')
+    return raw.map(parsePosition)
   }
 
   async getPosition(symbol: string): Promise<Position | null> {
     try {
       const raw = await this.client.tradingRequest<AlpacaPosition>(
-        "GET",
+        'GET',
         `/v2/positions/${encodeURIComponent(symbol)}`
-      );
-      return parsePosition(raw);
+      )
+      return parsePosition(raw)
     } catch (error) {
-      if ((error as { code?: string }).code === "NOT_FOUND") {
-        return null;
+      if ((error as { code?: string }).code === 'NOT_FOUND') {
+        return null
       }
-      throw error;
+      throw error
     }
   }
 
-  async closePosition(
-    symbol: string,
-    qty?: number,
-    percentage?: number
-  ): Promise<Order> {
-    let path = `/v2/positions/${encodeURIComponent(symbol)}`;
-    const params = new URLSearchParams();
+  async closePosition(symbol: string, qty?: number, percentage?: number): Promise<Order> {
+    let path = `/v2/positions/${encodeURIComponent(symbol)}`
+    const params = new URLSearchParams()
 
     if (qty !== undefined) {
-      params.set("qty", String(qty));
+      params.set('qty', String(qty))
     } else if (percentage !== undefined) {
-      params.set("percentage", String(percentage));
+      params.set('percentage', String(percentage))
     }
 
-    const queryString = params.toString();
+    const queryString = params.toString()
     if (queryString) {
-      path += `?${queryString}`;
+      path += `?${queryString}`
     }
 
-    return this.client.tradingRequest<Order>("DELETE", path);
+    return this.client.tradingRequest<Order>('DELETE', path)
   }
 
   async createOrder(params: OrderParams): Promise<Order> {
@@ -174,100 +170,94 @@ export class AlpacaTradingProvider implements BrokerProvider {
       side: params.side,
       type: params.type,
       time_in_force: params.time_in_force,
-    };
+    }
 
     if (params.qty !== undefined) {
-      body.qty = String(params.qty);
+      body.qty = String(params.qty)
     }
     if (params.notional !== undefined) {
-      body.notional = String(params.notional);
+      body.notional = String(params.notional)
     }
     if (params.limit_price !== undefined) {
-      body.limit_price = String(params.limit_price);
+      body.limit_price = String(params.limit_price)
     }
     if (params.stop_price !== undefined) {
-      body.stop_price = String(params.stop_price);
+      body.stop_price = String(params.stop_price)
     }
     if (params.trail_price !== undefined) {
-      body.trail_price = String(params.trail_price);
+      body.trail_price = String(params.trail_price)
     }
     if (params.trail_percent !== undefined) {
-      body.trail_percent = String(params.trail_percent);
+      body.trail_percent = String(params.trail_percent)
     }
     if (params.extended_hours !== undefined) {
-      body.extended_hours = params.extended_hours;
+      body.extended_hours = params.extended_hours
     }
     if (params.client_order_id !== undefined) {
-      body.client_order_id = params.client_order_id;
+      body.client_order_id = params.client_order_id
     }
 
-    return this.client.tradingRequest<Order>("POST", "/v2/orders", body);
+    return this.client.tradingRequest<Order>('POST', '/v2/orders', body)
   }
 
   async getOrder(orderId: string): Promise<Order> {
-    return this.client.tradingRequest<Order>(
-      "GET",
-      `/v2/orders/${encodeURIComponent(orderId)}`
-    );
+    return this.client.tradingRequest<Order>('GET', `/v2/orders/${encodeURIComponent(orderId)}`)
   }
 
   async listOrders(params?: ListOrdersParams): Promise<Order[]> {
-    let path = "/v2/orders";
+    let path = '/v2/orders'
 
     if (params) {
-      const searchParams = new URLSearchParams();
-      if (params.status) searchParams.set("status", params.status);
-      if (params.limit) searchParams.set("limit", String(params.limit));
-      if (params.after) searchParams.set("after", params.after);
-      if (params.until) searchParams.set("until", params.until);
-      if (params.direction) searchParams.set("direction", params.direction);
-      if (params.nested !== undefined) searchParams.set("nested", String(params.nested));
-      if (params.symbols?.length) searchParams.set("symbols", params.symbols.join(","));
+      const searchParams = new URLSearchParams()
+      if (params.status) searchParams.set('status', params.status)
+      if (params.limit) searchParams.set('limit', String(params.limit))
+      if (params.after) searchParams.set('after', params.after)
+      if (params.until) searchParams.set('until', params.until)
+      if (params.direction) searchParams.set('direction', params.direction)
+      if (params.nested !== undefined) searchParams.set('nested', String(params.nested))
+      if (params.symbols?.length) searchParams.set('symbols', params.symbols.join(','))
 
-      const queryString = searchParams.toString();
+      const queryString = searchParams.toString()
       if (queryString) {
-        path += `?${queryString}`;
+        path += `?${queryString}`
       }
     }
 
-    return this.client.tradingRequest<Order[]>("GET", path);
+    return this.client.tradingRequest<Order[]>('GET', path)
   }
 
   async cancelOrder(orderId: string): Promise<void> {
-    await this.client.tradingRequest<void>(
-      "DELETE",
-      `/v2/orders/${encodeURIComponent(orderId)}`
-    );
+    await this.client.tradingRequest<void>('DELETE', `/v2/orders/${encodeURIComponent(orderId)}`)
   }
 
   async cancelAllOrders(): Promise<void> {
-    await this.client.tradingRequest<void>("DELETE", "/v2/orders");
+    await this.client.tradingRequest<void>('DELETE', '/v2/orders')
   }
 
   async getClock(): Promise<MarketClock> {
-    const raw = await this.client.tradingRequest<AlpacaClock>("GET", "/v2/clock");
+    const raw = await this.client.tradingRequest<AlpacaClock>('GET', '/v2/clock')
     return {
       timestamp: raw.timestamp,
       is_open: raw.is_open,
       next_open: raw.next_open,
       next_close: raw.next_close,
-    };
+    }
   }
 
   async getCalendar(start: string, end: string): Promise<MarketDay[]> {
     const raw = await this.client.tradingRequest<AlpacaCalendarDay[]>(
-      "GET",
+      'GET',
       `/v2/calendar?start=${start}&end=${end}`
-    );
+    )
     return raw.map((day) => ({
       date: day.date,
       open: day.open,
       close: day.close,
       settlement_date: day.settlement_date,
-    }));
+    }))
   }
 }
 
 export function createAlpacaTradingProvider(client: AlpacaClient): AlpacaTradingProvider {
-  return new AlpacaTradingProvider(client);
+  return new AlpacaTradingProvider(client)
 }

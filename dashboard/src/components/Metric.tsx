@@ -22,19 +22,11 @@ const colorClasses = {
   error: 'text-hud-error',
 }
 
-export function Metric({
-  label,
-  value,
-  size = 'lg',
-  color = 'default',
-  className,
-}: MetricProps) {
+export function Metric({ label, value, size = 'lg', color = 'default', className }: MetricProps) {
   return (
     <div className={clsx('flex flex-col', className)}>
       <span className="hud-label mb-1">{label}</span>
-      <span className={clsx(sizeClasses[size], colorClasses[color])}>
-        {value}
-      </span>
+      <span className={clsx(sizeClasses[size], colorClasses[color])}>{value}</span>
     </div>
   )
 }
@@ -57,9 +49,7 @@ export function MetricInline({
   return (
     <div className={clsx('flex items-baseline gap-2', className)}>
       <span className="hud-label">{label}</span>
-      <span className={clsx('hud-value-sm', valueClassName || colorClasses[color])}>
-        {value}
-      </span>
+      <span className={clsx('hud-value-sm', valueClassName || colorClasses[color])}>{value}</span>
     </div>
   )
 }

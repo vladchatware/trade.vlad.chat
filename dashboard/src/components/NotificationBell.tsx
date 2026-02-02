@@ -13,15 +13,16 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
   const [hasRead, setHasRead] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const hasActivity = overnightActivity && (
-    overnightActivity.signalsGathered > 0 ||
-    overnightActivity.signalsResearched > 0 ||
-    overnightActivity.buySignals > 0
-  )
-  
-  const unreadCount = hasActivity && !hasRead
-    ? (overnightActivity?.buySignals || 0) + (premarketPlan?.highConvictionPlays?.length || 0)
-    : 0
+  const hasActivity =
+    overnightActivity &&
+    (overnightActivity.signalsGathered > 0 ||
+      overnightActivity.signalsResearched > 0 ||
+      overnightActivity.buySignals > 0)
+
+  const unreadCount =
+    hasActivity && !hasRead
+      ? (overnightActivity?.buySignals || 0) + (premarketPlan?.highConvictionPlays?.length || 0)
+      : 0
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -29,20 +30,20 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
         setIsOpen(false)
       }
     }
-    
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       setHasRead(true)
     }
-    
+
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen])
 
   const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: false 
+      hour12: false,
     })
   }
 
@@ -55,19 +56,19 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
           isOpen ? 'text-hud-primary' : 'text-hud-text-dim hover:text-hud-text'
         )}
       >
-        <svg 
-          width="16" 
-          height="16" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
           strokeWidth="1.5"
           className={clsx(unreadCount > 0 && 'animate-pulse')}
         >
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        
+
         {unreadCount > 0 && (
           <motion.span
             initial={{ scale: 0 }}
@@ -105,34 +106,38 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <ActivityStat 
-                      label="SIGNALS FOUND" 
-                      value={overnightActivity?.signalsGathered || 0} 
+                    <ActivityStat
+                      label="SIGNALS FOUND"
+                      value={overnightActivity?.signalsGathered || 0}
                     />
-                    <ActivityStat 
-                      label="RESEARCHED" 
-                      value={overnightActivity?.signalsResearched || 0} 
+                    <ActivityStat
+                      label="RESEARCHED"
+                      value={overnightActivity?.signalsResearched || 0}
                     />
-                    <ActivityStat 
-                      label="BUY SIGNALS" 
+                    <ActivityStat
+                      label="BUY SIGNALS"
                       value={overnightActivity?.buySignals || 0}
-                      highlight={overnightActivity?.buySignals ? overnightActivity.buySignals > 0 : false}
+                      highlight={
+                        overnightActivity?.buySignals ? overnightActivity.buySignals > 0 : false
+                      }
                     />
-                    <ActivityStat 
-                      label="TWITTER CONF" 
-                      value={overnightActivity?.twitterConfirmations || 0} 
+                    <ActivityStat
+                      label="TWITTER CONF"
+                      value={overnightActivity?.twitterConfirmations || 0}
                     />
                   </div>
 
                   <div className="pt-2 border-t border-hud-line/50">
                     <div className="flex items-center justify-between mb-2">
                       <span className="hud-label">PRE-MARKET PLAN</span>
-                      <span className={clsx(
-                        'text-[9px] px-1.5 py-0.5 rounded',
-                        overnightActivity?.premarketPlanReady
-                          ? 'bg-hud-success/20 text-hud-success'
-                          : 'bg-hud-text-dim/20 text-hud-text-dim'
-                      )}>
+                      <span
+                        className={clsx(
+                          'text-[9px] px-1.5 py-0.5 rounded',
+                          overnightActivity?.premarketPlanReady
+                            ? 'bg-hud-success/20 text-hud-success'
+                            : 'bg-hud-text-dim/20 text-hud-text-dim'
+                        )}
+                      >
                         {overnightActivity?.premarketPlanReady ? 'READY' : 'PENDING'}
                       </span>
                     </div>
@@ -142,7 +147,7 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
                         <span className="text-[9px] text-hud-text-dim">HIGH CONVICTION:</span>
                         <div className="flex flex-wrap gap-1">
                           {premarketPlan.highConvictionPlays.map((symbol) => (
-                            <span 
+                            <span
                               key={symbol}
                               className="text-xs px-1.5 py-0.5 bg-hud-success/10 text-hud-success border border-hud-success/30 rounded"
                             >
@@ -170,21 +175,23 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
   )
 }
 
-function ActivityStat({ 
-  label, 
-  value, 
-  highlight = false 
-}: { 
+function ActivityStat({
+  label,
+  value,
+  highlight = false,
+}: {
   label: string
   value: number
-  highlight?: boolean 
+  highlight?: boolean
 }) {
   return (
     <div className="text-center">
-      <div className={clsx(
-        'text-lg font-light',
-        highlight ? 'text-hud-success' : 'text-hud-text-bright'
-      )}>
+      <div
+        className={clsx(
+          'text-lg font-light',
+          highlight ? 'text-hud-success' : 'text-hud-text-bright'
+        )}
+      >
         {value}
       </div>
       <div className="hud-label">{label}</div>

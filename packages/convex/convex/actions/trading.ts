@@ -1,13 +1,13 @@
-import { action } from './_generated/server'
-import { internal } from './_generated/api'
 import { v } from 'convex/values'
 import { createAlpacaClient } from '../providers/alpaca'
-import { createPolicyEngine } from '../policy/engine'
-import crypto from 'crypto'
+import { internal } from './_generated/api'
+import { action } from './_generated/server'
 
 export const getAccount = action({
   args: {},
-  handler: async (ctx): Promise<{
+  handler: async (
+    _ctx
+  ): Promise<{
     equity: number
     cash: number
     buyingPower: number
@@ -26,7 +26,9 @@ export const getAccount = action({
 
 export const getPositions = action({
   args: {},
-  handler: async (ctx): Promise<
+  handler: async (
+    _ctx
+  ): Promise<
     Array<{
       symbol: string
       qty: number
@@ -68,7 +70,7 @@ export const closePosition = action({
 
 export const getMarketClock = action({
   args: {},
-  handler: async (ctx): Promise<{ isOpen: boolean; nextOpen: string; nextClose: string }> => {
+  handler: async (_ctx): Promise<{ isOpen: boolean; nextOpen: string; nextClose: string }> => {
     const alpaca = createAlpacaClient()
     const clock = await alpaca.getClock()
     return {

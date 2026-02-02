@@ -72,9 +72,7 @@ export class AlpacaClient {
     this.apiKey = config.apiKey
     this.apiSecret = config.apiSecret
     this.paper = config.paper
-    this.baseUrl = config.paper
-      ? 'https://paper-api.alpaca.markets'
-      : 'https://api.alpaca.markets'
+    this.baseUrl = config.paper ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets'
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

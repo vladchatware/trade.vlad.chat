@@ -1,7 +1,7 @@
-import { action } from './_generated/server'
-import { internal } from './_generated/api'
 import { v } from 'convex/values'
-import { completeWithGateway, calculateCost } from '../providers/llm'
+import { calculateCost, completeWithGateway } from '../providers/llm'
+import { internal } from './_generated/api'
+import { action } from './_generated/server'
 
 export const researchSignal = action({
   args: {
@@ -51,7 +51,13 @@ Respond with JSON:
         catalysts: parsed.catalysts || [],
       }
     } catch {
-      return { verdict: 'SKIP', confidence: 0, reasoning: 'Parse error', redFlags: [], catalysts: [] }
+      return {
+        verdict: 'SKIP',
+        confidence: 0,
+        reasoning: 'Parse error',
+        redFlags: [],
+        catalysts: [],
+      }
     }
   },
 })

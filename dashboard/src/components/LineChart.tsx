@@ -60,21 +60,27 @@ export function LineChart({
   const maxPoints = Math.max(...series.map((s) => s.data.length), 1)
 
   const getX = (index: number) => padding.left + (index / (maxPoints - 1 || 1)) * chartWidth
-  const getY = (value: number) => padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight
+  const getY = (value: number) =>
+    padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight
 
   const gridLines = 4
-  const gridValues = Array.from({ length: gridLines }, (_, i) => minValue + (valueRange / (gridLines - 1)) * i)
+  const gridValues = Array.from(
+    { length: gridLines },
+    (_, i) => minValue + (valueRange / (gridLines - 1)) * i
+  )
 
-  const formatLabel = formatValue || ((v: number) => {
-    if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`
-    return v.toFixed(0)
-  })
+  const formatLabel =
+    formatValue ||
+    ((v: number) => {
+      if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`
+      return v.toFixed(0)
+    })
 
   return (
-    <svg 
-      width="100%" 
-      height="100%" 
-      viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} 
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
       preserveAspectRatio="xMidYMid meet"
       className="block"
     >
@@ -110,22 +116,24 @@ export function LineChart({
 
       {labels && (
         <g>
-          {labels.filter((_, i) => i % Math.ceil(labels.length / 5) === 0).map((label, i) => {
-            const actualIndex = i * Math.ceil(labels.length / 5)
-            return (
-              <text
-                key={i}
-                x={getX(actualIndex)}
-                y={viewBoxHeight - 8}
-                textAnchor="middle"
-                fill="currentColor"
-                className="text-hud-text-dim"
-                fontSize={12}
-              >
-                {label}
-              </text>
-            )
-          })}
+          {labels
+            .filter((_, i) => i % Math.ceil(labels.length / 5) === 0)
+            .map((label, i) => {
+              const actualIndex = i * Math.ceil(labels.length / 5)
+              return (
+                <text
+                  key={i}
+                  x={getX(actualIndex)}
+                  y={viewBoxHeight - 8}
+                  textAnchor="middle"
+                  fill="currentColor"
+                  className="text-hud-text-dim"
+                  fontSize={12}
+                >
+                  {label}
+                </text>
+              )
+            })}
         </g>
       )}
 
@@ -133,7 +141,7 @@ export function LineChart({
         const colors = variantColors[s.variant ?? variant]
         const points = s.data.map((value, i) => ({ x: getX(i), y: getY(value) }))
         if (points.length === 0) return null
-        
+
         const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
         const areaD = `${pathD} L ${points[points.length - 1]?.x ?? 0} ${padding.top + chartHeight} L ${points[0]?.x ?? 0} ${padding.top + chartHeight} Z`
 
@@ -141,13 +149,19 @@ export function LineChart({
           <g key={seriesIndex}>
             {showArea && (
               <defs>
-                <linearGradient id={`area-gradient-${seriesIndex}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                <linearGradient
+                  id={`area-gradient-${seriesIndex}`}
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
                   <stop offset="0%" stopColor={colors.fill} stopOpacity={0.2} />
                   <stop offset="100%" stopColor={colors.fill} stopOpacity={0} />
                 </linearGradient>
               </defs>
             )}
-            
+
             {showArea && (
               <motion.path
                 d={areaD}
@@ -201,14 +215,9 @@ interface SparklineProps {
   showChange?: boolean
 }
 
-export function Sparkline({
-  data,
-  width = 80,
-  height = 24,
-  variant = 'cyan',
-}: SparklineProps) {
+export function Sparkline({ data, width = 80, height = 24, variant = 'cyan' }: SparklineProps) {
   if (data.length < 2) return null
-  
+
   const padding = 2
   const chartWidth = width - padding * 2
   const chartHeight = height - padding * 2
@@ -222,7 +231,9 @@ export function Sparkline({
     y: padding + chartHeight - ((value - minValue) / valueRange) * chartHeight,
   }))
 
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
+  const pathD = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(' ')
   const isPositive = data[data.length - 1] >= data[0]
   const colors = variantColors[variant] || (isPositive ? variantColors.green : variantColors.red)
 

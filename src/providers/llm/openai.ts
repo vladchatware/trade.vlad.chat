@@ -1,37 +1,37 @@
-import { createError, ErrorCode } from "../../lib/errors";
-import type { LLMProvider, CompletionParams, CompletionResult } from "../types";
+import { createError, ErrorCode } from '../../lib/errors'
+import type { LLMProvider, CompletionParams, CompletionResult } from '../types'
 
 export interface OpenAIConfig {
-  apiKey: string;
-  model?: string;
-  baseUrl?: string;
+  apiKey: string
+  model?: string
+  baseUrl?: string
 }
 
 interface OpenAIResponse {
-  id: string;
+  id: string
   choices: Array<{
     message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
+      role: string
+      content: string
+    }
+    finish_reason: string
+  }>
   usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
 }
 
 export class OpenAIProvider implements LLMProvider {
-  private apiKey: string;
-  private model: string;
-  private baseUrl: string;
+  private apiKey: string
+  private model: string
+  private baseUrl: string
 
   constructor(config: OpenAIConfig) {
-    this.apiKey = config.apiKey;
-    this.model = config.model ?? "gpt-4o-mini";
-    this.baseUrl = config.baseUrl ?? "https://api.openai.com/v1";
+    this.apiKey = config.apiKey
+    this.model = config.model ?? 'gpt-4o-mini'
+    this.baseUrl = config.baseUrl ?? 'https://api.openai.com/v1'
   }
 
   async complete(params: CompletionParams): Promise<CompletionResult> {
@@ -40,32 +40,32 @@ export class OpenAIProvider implements LLMProvider {
       messages: params.messages,
       temperature: params.temperature ?? 0.7,
       max_tokens: params.max_tokens ?? 1024,
-    };
+    }
 
     if (params.response_format) {
-      body.response_format = params.response_format;
+      body.response_format = params.response_format
     }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(body),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text()
       throw createError(
         ErrorCode.PROVIDER_ERROR,
         `OpenAI API error (${response.status}): ${errorText}`
-      );
+      )
     }
 
-    const data = (await response.json()) as OpenAIResponse;
+    const data = (await response.json()) as OpenAIResponse
 
-    const content = data.choices[0]?.message?.content ?? "";
+    const content = data.choices[0]?.message?.content ?? ''
 
     return {
       content,
@@ -74,10 +74,10 @@ export class OpenAIProvider implements LLMProvider {
         completion_tokens: data.usage.completion_tokens,
         total_tokens: data.usage.total_tokens,
       },
-    };
+    }
   }
 }
 
 export function createOpenAIProvider(config: OpenAIConfig): OpenAIProvider {
-  return new OpenAIProvider(config);
+  return new OpenAIProvider(config)
 }

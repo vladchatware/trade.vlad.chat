@@ -1,6 +1,6 @@
-import { action } from './_generated/server'
-import { internal } from './_generated/api'
 import { createAlpacaClient } from '../providers/alpaca'
+import { internal } from './_generated/api'
+import { action } from './_generated/server'
 
 // Main trading loop - ported from agent-v1.mjs
 export const runTrading = action({
@@ -25,7 +25,7 @@ export const runTrading = action({
 
     // Check positions for exits (stop-loss, take-profit)
     for (const pos of positions) {
-      const plPct = parseFloat(pos.unrealized_plpc) * 100
+      const plPct = Number.parseFloat(pos.unrealized_plpc) * 100
 
       if (plPct >= config.takeProfitPct) {
         await ctx.runAction(internal.actions.closePosition, {
@@ -101,12 +101,12 @@ export const gatherData = action({
 
       const positionData = {
         symbol: pos.symbol,
-        qty: parseFloat(pos.qty),
-        avgEntryPrice: parseFloat(pos.avg_entry_price),
-        currentPrice: parseFloat(pos.current_price),
-        marketValue: parseFloat(pos.market_value),
-        unrealizedPl: parseFloat(pos.unrealized_pl),
-        unrealizedPlpc: parseFloat(pos.unrealized_plpc),
+        qty: Number.parseFloat(pos.qty),
+        avgEntryPrice: Number.parseFloat(pos.avg_entry_price),
+        currentPrice: Number.parseFloat(pos.current_price),
+        marketValue: Number.parseFloat(pos.market_value),
+        unrealizedPl: Number.parseFloat(pos.unrealized_pl),
+        unrealizedPlpc: Number.parseFloat(pos.unrealized_plpc),
         updatedAt: Date.now(),
       }
 

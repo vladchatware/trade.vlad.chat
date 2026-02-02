@@ -27,7 +27,7 @@ export async function completeWithGateway(params: CompletionParams): Promise<Com
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${VERCEL_AI_GATEWAY_TOKEN}`,
+      Authorization: `Bearer ${VERCEL_AI_GATEWAY_TOKEN}`,
     },
     body: JSON.stringify({
       model: params.model,

@@ -2,15 +2,15 @@ export const CacheKeys = {
   symbolOverview: (symbol: string) => `overview:${symbol}`,
   symbolQuote: (symbol: string) => `quote:${symbol}`,
   symbolBars: (symbol: string, timeframe: string) => `bars:${symbol}:${timeframe}`,
-  movers: (direction: "up" | "down") => `movers:${direction}`,
-  macroSnapshot: () => "macro:snapshot",
-  marketClock: () => "market:clock",
+  movers: (direction: 'up' | 'down') => `movers:${direction}`,
+  macroSnapshot: () => 'macro:snapshot',
+  marketClock: () => 'market:clock',
   marketCalendar: (month: string) => `market:calendar:${month}`,
   technicals: (symbol: string) => `technicals:${symbol}`,
   signals: (symbol: string) => `signals:${symbol}`,
   newsIndex: (symbol: string) => `news:index:${symbol}`,
   discoveryList: (listId: string) => `discovery:${listId}`,
-} as const;
+} as const
 
 export const CacheTTL = {
   QUOTE: 30,
@@ -25,4 +25,4 @@ export const CacheTTL = {
   SIGNALS: 120,
   NEWS_INDEX: 300,
   DISCOVERY: 300,
-} as const;
+} as const

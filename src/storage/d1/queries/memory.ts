@@ -1,26 +1,26 @@
-import { D1Client, TradeJournalRow } from "../client";
-import { generateId, nowISO } from "../../../lib/utils";
+import { D1Client, TradeJournalRow } from '../client'
+import { generateId, nowISO } from '../../../lib/utils'
 
 export interface CreateJournalEntryParams {
-  trade_id?: string;
-  symbol: string;
-  side: string;
-  entry_price?: number;
-  entry_at?: string;
-  qty: number;
-  signals?: Record<string, unknown>;
-  technicals?: Record<string, unknown>;
-  regime_tags?: string[];
-  event_ids?: string[];
-  notes?: string;
+  trade_id?: string
+  symbol: string
+  side: string
+  entry_price?: number
+  entry_at?: string
+  qty: number
+  signals?: Record<string, unknown>
+  technicals?: Record<string, unknown>
+  regime_tags?: string[]
+  event_ids?: string[]
+  notes?: string
 }
 
 export async function createJournalEntry(
   db: D1Client,
   params: CreateJournalEntryParams
 ): Promise<string> {
-  const id = generateId();
-  const now = nowISO();
+  const id = generateId()
+  const now = nowISO()
 
   await db.run(
     `INSERT INTO trade_journal (id, trade_id, symbol, side, entry_price, entry_at, qty, signals_json, technicals_json, regime_tags, event_ids, notes, created_at, updated_at)
@@ -35,33 +35,30 @@ export async function createJournalEntry(
       params.qty,
       params.signals ? JSON.stringify(params.signals) : null,
       params.technicals ? JSON.stringify(params.technicals) : null,
-      params.regime_tags?.join(",") ?? null,
-      params.event_ids?.join(",") ?? null,
+      params.regime_tags?.join(',') ?? null,
+      params.event_ids?.join(',') ?? null,
       params.notes ?? null,
       now,
       now,
     ]
-  );
+  )
 
-  return id;
+  return id
 }
 
 export interface LogOutcomeParams {
-  journal_id: string;
-  exit_price: number;
-  exit_at?: string;
-  pnl_usd: number;
-  pnl_pct: number;
-  hold_duration_mins: number;
-  outcome: "win" | "loss" | "scratch";
-  lessons_learned?: string;
+  journal_id: string
+  exit_price: number
+  exit_at?: string
+  pnl_usd: number
+  pnl_pct: number
+  hold_duration_mins: number
+  outcome: 'win' | 'loss' | 'scratch'
+  lessons_learned?: string
 }
 
-export async function logOutcome(
-  db: D1Client,
-  params: LogOutcomeParams
-): Promise<void> {
-  const now = nowISO();
+export async function logOutcome(db: D1Client, params: LogOutcomeParams): Promise<void> {
+  const now = nowISO()
 
   await db.run(
     `UPDATE trade_journal 
@@ -78,70 +75,64 @@ export async function logOutcome(
       now,
       params.journal_id,
     ]
-  );
+  )
 }
 
-export async function getJournalEntry(
-  db: D1Client,
-  id: string
-): Promise<TradeJournalRow | null> {
-  return db.executeOne<TradeJournalRow>(
-    `SELECT * FROM trade_journal WHERE id = ?`,
-    [id]
-  );
+export async function getJournalEntry(db: D1Client, id: string): Promise<TradeJournalRow | null> {
+  return db.executeOne<TradeJournalRow>(`SELECT * FROM trade_journal WHERE id = ?`, [id])
 }
 
 export async function queryJournal(
   db: D1Client,
   params: {
-    symbol?: string;
-    outcome?: string;
-    regime_tag?: string;
-    limit?: number;
-    offset?: number;
+    symbol?: string
+    outcome?: string
+    regime_tag?: string
+    limit?: number
+    offset?: number
   }
 ): Promise<TradeJournalRow[]> {
-  const { symbol, outcome, regime_tag, limit = 50, offset = 0 } = params;
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+  const { symbol, outcome, regime_tag, limit = 50, offset = 0 } = params
+  const conditions: string[] = []
+  const values: unknown[] = []
 
   if (symbol) {
-    conditions.push("symbol = ?");
-    values.push(symbol.toUpperCase());
+    conditions.push('symbol = ?')
+    values.push(symbol.toUpperCase())
   }
   if (outcome) {
-    conditions.push("outcome = ?");
-    values.push(outcome);
+    conditions.push('outcome = ?')
+    values.push(outcome)
   }
   if (regime_tag) {
-    conditions.push("regime_tags LIKE ?");
-    values.push(`%${regime_tag}%`);
+    conditions.push('regime_tags LIKE ?')
+    values.push(`%${regime_tag}%`)
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  values.push(limit, offset);
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  values.push(limit, offset)
 
   return db.execute<TradeJournalRow>(
     `SELECT * FROM trade_journal ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     values
-  );
+  )
 }
 
 export async function getJournalStats(
   db: D1Client,
   params: { symbol?: string; days?: number } = {}
 ): Promise<{
-  total_trades: number;
-  wins: number;
-  losses: number;
-  scratches: number;
-  total_pnl: number;
-  avg_pnl: number;
-  win_rate: number;
-  avg_hold_mins: number;
+  total_trades: number
+  wins: number
+  losses: number
+  scratches: number
+  total_pnl: number
+  avg_pnl: number
+  win_rate: number
+  avg_hold_mins: number
 }> {
-  const { symbol, days = 30 } = params;
-  const dateLimit = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { symbol, days = 30 } = params
+  const dateLimit = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
   let query = `
     SELECT 
@@ -154,23 +145,23 @@ export async function getJournalStats(
       COALESCE(AVG(hold_duration_mins), 0) as avg_hold_mins
     FROM trade_journal
     WHERE created_at >= ?
-  `;
-  const values: unknown[] = [dateLimit];
+  `
+  const values: unknown[] = [dateLimit]
 
   if (symbol) {
-    query += " AND symbol = ?";
-    values.push(symbol.toUpperCase());
+    query += ' AND symbol = ?'
+    values.push(symbol.toUpperCase())
   }
 
   const row = await db.executeOne<{
-    total_trades: number;
-    wins: number;
-    losses: number;
-    scratches: number;
-    total_pnl: number;
-    avg_pnl: number;
-    avg_hold_mins: number;
-  }>(query, values);
+    total_trades: number
+    wins: number
+    losses: number
+    scratches: number
+    total_pnl: number
+    avg_pnl: number
+    avg_hold_mins: number
+  }>(query, values)
 
   if (!row || row.total_trades === 0) {
     return {
@@ -182,7 +173,7 @@ export async function getJournalStats(
       avg_pnl: 0,
       win_rate: 0,
       avg_hold_mins: 0,
-    };
+    }
   }
 
   return {
@@ -194,31 +185,31 @@ export async function getJournalStats(
     avg_pnl: row.avg_pnl,
     win_rate: row.total_trades > 0 ? row.wins / row.total_trades : 0,
     avg_hold_mins: row.avg_hold_mins,
-  };
+  }
 }
 
 export interface MemoryRuleRow {
-  id: string;
-  rule_type: string;
-  description: string;
-  conditions_json: string | null;
-  confidence: number | null;
-  source: string;
-  active: number;
-  created_at: string;
+  id: string
+  rule_type: string
+  description: string
+  conditions_json: string | null
+  confidence: number | null
+  source: string
+  active: number
+  created_at: string
 }
 
 export async function createMemoryRule(
   db: D1Client,
   params: {
-    rule_type: string;
-    description: string;
-    conditions?: Record<string, unknown>;
-    confidence?: number;
-    source: string;
+    rule_type: string
+    description: string
+    conditions?: Record<string, unknown>
+    confidence?: number
+    source: string
   }
 ): Promise<string> {
-  const id = generateId();
+  const id = generateId()
 
   await db.run(
     `INSERT INTO memory_rules (id, rule_type, description, conditions_json, confidence, source, active, created_at)
@@ -232,32 +223,30 @@ export async function createMemoryRule(
       params.source,
       nowISO(),
     ]
-  );
+  )
 
-  return id;
+  return id
 }
 
 export async function getActiveRules(db: D1Client): Promise<MemoryRuleRow[]> {
   return db.execute<MemoryRuleRow>(
     `SELECT * FROM memory_rules WHERE active = 1 ORDER BY created_at DESC`
-  );
+  )
 }
 
-export async function getPreferences(
-  db: D1Client
-): Promise<Record<string, unknown>> {
+export async function getPreferences(db: D1Client): Promise<Record<string, unknown>> {
   const row = await db.executeOne<{ preferences_json: string }>(
     `SELECT preferences_json FROM memory_preferences WHERE id = 1`
-  );
-  return row ? JSON.parse(row.preferences_json) : {};
+  )
+  return row ? JSON.parse(row.preferences_json) : {}
 }
 
 export async function setPreferences(
   db: D1Client,
   preferences: Record<string, unknown>
 ): Promise<void> {
-  await db.run(
-    `UPDATE memory_preferences SET preferences_json = ?, updated_at = ? WHERE id = 1`,
-    [JSON.stringify(preferences), nowISO()]
-  );
+  await db.run(`UPDATE memory_preferences SET preferences_json = ?, updated_at = ? WHERE id = 1`, [
+    JSON.stringify(preferences),
+    nowISO(),
+  ])
 }

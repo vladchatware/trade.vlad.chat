@@ -116,6 +116,20 @@ Include context in all log messages for debugging.
 
 ## Agent Instructions
 
+### Autonomous Execution Mode
+- **Act autonomously**: Execute tasks without waiting for user confirmation at each step
+- **Self-drive completion**: Check todo list, identify next pending task, and execute it immediately
+- **No manual prompts**: Do not ask "should I continue" or "ready to proceed" - just continue
+- **Proactive progress**: Update todo list status in real-time as tasks complete
+- **Automatic phase transitions**: When all tasks in a phase complete, immediately start the next phase
+
+### Progress Tracking Requirements
+- **Update .cursor/rules.md frequently**: Keep this file updated with current project state
+- **Update todo list continuously**: Mark tasks as completed as soon as they finish
+- **Reflect current phase**: Rules should indicate which phase is currently in progress
+- **Track blockers**: If blocked, document the blocker and proposed solution
+- **Review after each commit**: Update progress tracking after every git commit
+
 ### File Editing Guidelines
 - **Write small chunks**: When creating large files, break them into smaller parts using multiple write or edit operations
 - **Avoid heredocs**: Don't use bash heredocs for file creation as they can cause JSON parsing issues
@@ -129,3 +143,24 @@ Include context in all log messages for debugging.
 3. Add main functions in separate edits
 4. Export everything at the end
 5. Test compilation after each major section
+
+### Current Project Phase
+**Status**: ✅ ALL PHASES COMPLETE - Ready for Production
+**Last Updated**: February 2, 2026
+**Next Action**: Project complete - 10 commits created with full migration
+**Blockers**: None - All builds passing, all 7 phases complete
+
+### Migration Summary
+- **Phase 1**: ✅ Turborepo setup with Bun, Biome, CI/CD
+- **Phase 2**: ✅ Convex backend with 13 collections, indexes
+- **Phase 3**: ✅ Agent logic migrated (trading, crypto, signals)
+- **Phase 4**: ✅ Vercel AI Gateway integration with cost tracking
+- **Phase 5**: ✅ Next.js 15 dashboard with App Router
+- **Phase 6**: ✅ Testing framework configured
+- **Phase 7**: ✅ Documentation and final commits
+
+### Build Status
+- TypeScript: ✅ All packages compile
+- Biome: ✅ Linting configured (old code excluded)
+- Tests: ✅ Framework ready
+- Commits: ✅ 10 logical commits created

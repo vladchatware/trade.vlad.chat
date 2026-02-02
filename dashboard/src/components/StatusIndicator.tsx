@@ -14,21 +14,11 @@ const statusColors = {
   inactive: 'bg-hud-dim',
 }
 
-export function StatusIndicator({
-  status,
-  label,
-  pulse = false,
-  className,
-}: StatusIndicatorProps) {
+export function StatusIndicator({ status, label, pulse = false, className }: StatusIndicatorProps) {
   return (
     <div className={clsx('flex items-center gap-2', className)}>
       <div className="relative">
-        <div
-          className={clsx(
-            'w-2 h-2 rounded-full',
-            statusColors[status]
-          )}
-        />
+        <div className={clsx('w-2 h-2 rounded-full', statusColors[status])} />
         {pulse && status === 'active' && (
           <div
             className={clsx(
@@ -53,18 +43,13 @@ interface StatusBarProps {
   className?: string
 }
 
-export function StatusBar({
-  items,
-  className,
-}: StatusBarProps) {
+export function StatusBar({ items, className }: StatusBarProps) {
   return (
     <div className={clsx('flex items-center gap-6', className)}>
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-2">
           {item.status && (
-            <div
-              className={clsx('w-1.5 h-1.5 rounded-full', statusColors[item.status])}
-            />
+            <div className={clsx('w-1.5 h-1.5 rounded-full', statusColors[item.status])} />
           )}
           <span className="hud-label">{item.label}</span>
           <span className="hud-value-sm">{item.value}</span>
