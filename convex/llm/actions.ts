@@ -1,3 +1,5 @@
+'use node'
+
 import { v } from 'convex/values'
 import { calculateCost, completeWithGateway } from '../providers/llm'
 import { internal } from './_generated/api'

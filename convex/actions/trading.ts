@@ -1,3 +1,5 @@
+'use node'
+
 import { v } from 'convex/values'
 import { createAlpacaClient } from '../providers/alpaca'
 import { internal } from './_generated/api'

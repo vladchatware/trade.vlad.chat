@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { mutation } from './_generated/server'
+import { mutation, query } from './_generated/server'
 
 export const create = mutation({
   args: {
@@ -14,5 +14,14 @@ export const create = mutation({
       detailsJson: args.details ? JSON.stringify(args.details) : undefined,
       timestamp: Date.now(),
     })
+  },
+})
+
+export const getRecent = query({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.query('activityLogs').order('desc').take(args.limit)
   },
 })
