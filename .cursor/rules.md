@@ -1,5 +1,7 @@
 # MAHORAGA Project Coding Standards
 
+We are the documents we maintain.
+
 ## TypeScript Rules
 
 ### Strict Type Safety
@@ -143,6 +145,9 @@ Include context in all log messages for debugging.
 3. Add main functions in separate edits
 4. Export everything at the end
 5. Test compilation after each major section
+6. Keep cyclomatic complexity low
+7. Keep the files organized and maintainable
+8. Keep the modules flexible and reusable at the appropriate level of abstraction
 
 ### Current Project Phase
 **Status**: ✅ ALL PHASES COMPLETE - Ready for Production

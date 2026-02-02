@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'MAHORAGA Trading Dashboard',
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="dark bg-gray-950 text-white">{children}</body>
+      <body className="dark bg-gray-950 text-white">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }
