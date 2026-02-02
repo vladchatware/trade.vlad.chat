@@ -1,0 +1,27 @@
+{
+  "name": "@mahoraga/convex",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "build": "tsc --noEmit",
+    "deploy": "convex deploy",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf _generated node_modules .turbo"
+  },
+  "dependencies": {
+    "convex": "^1.17.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.2",
+    "convex-test": "^0.0.8",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}
