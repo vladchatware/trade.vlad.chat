@@ -1,0 +1,28 @@
+commit-msg:
+  scripts:
+    commitlint:
+      run: bunx commitlint --edit {1}
+  piped: true
+
+pre-commit:
+  parallel: true
+  commands:
+    biome-check:
+      glob: "*.{js,ts,jsx,tsx,json}"
+      run: bunx @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
+    
+    typecheck:
+      glob: "packages/*/**/*.{ts,tsx}"
+      run: bun run typecheck
+
+pre-push:
+  parallel: true
+  commands:
+    test:
+      run: bun run test
+    
+    lint:
+      run: bun run lint
+    
+    build:
+      run: bun run build

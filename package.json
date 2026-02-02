@@ -1,35 +1,33 @@
 {
   "name": "mahoraga",
-  "version": "0.1.0",
-  "description": "Cloudflare Workers MCP server for autonomous stock trading with Alpaca",
-  "type": "module",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Autonomous LLM-powered trading agent - Next.js + Convex + Vercel AI Gateway",
+  "workspaces": ["packages/*"],
+  "packageManager": "bun@1.1.0",
   "scripts": {
-    "dev": "wrangler dev",
-    "build": "tsc",
-    "deploy": "wrangler deploy",
-    "deploy:production": "wrangler deploy --env production",
-    "db:migrate": "wrangler d1 migrations apply mahoraga-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply mahoraga-db --remote",
-    "db:studio": "wrangler d1 execute mahoraga-db --local --command 'SELECT 1'",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
-    "test": "vitest",
-    "test:run": "vitest run"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "agents": "^0.0.74",
-    "openai": "^6.16.0",
-    "zod": "^3.23.8"
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "convex:dev": "bun --cwd packages/convex convex dev",
+    "convex:deploy": "bun --cwd packages/convex convex deploy",
+    "dashboard:dev": "bun --cwd packages/dashboard dev",
+    "dashboard:build": "bun --cwd packages/dashboard build",
+    "dashboard:start": "bun --cwd packages/dashboard start"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241218.0",
-    "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8",
-    "wrangler": "^4.61.1"
+    "@biomejs/biome": "^1.9.4",
+    "lefthook": "^1.10.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "bun": ">=1.1.0"
   }
 }

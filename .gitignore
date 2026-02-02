@@ -39,6 +39,16 @@ build/
 *.js.map
 .wrangler/
 
+# Turborepo
+.turbo/
+packages/*/dist/
+packages/*/.turbo/
+packages/*/_generated/
+
+# Next.js
+.next/
+out/
+
 # -----------------------------------------------------------------------------
 # Logs
 # -----------------------------------------------------------------------------
