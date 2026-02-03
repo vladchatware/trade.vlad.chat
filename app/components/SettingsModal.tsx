@@ -1,3 +1,5 @@
+import { LLM_MODELS } from '@/shared/llmCatalog'
+import { withTradingConfigDefaults } from '@/shared/tradingConfig'
 import { useEffect, useState } from 'react'
 import { Panel } from './Panel'
 
@@ -45,35 +47,38 @@ interface SettingsModalProps {
   onSave: (config: Config) => void | Promise<void>
 }
 
-const normalizeConfig = (input: Config): Config => ({
-  ...input,
-  sellSentimentThreshold: input.sellSentimentThreshold ?? 0,
-  dataPollIntervalMs: input.dataPollIntervalMs ?? 5000,
-  analystIntervalMs: input.analystIntervalMs ?? 300000,
-  llmAnalystModel: input.llmAnalystModel ?? 'openai/gpt-5.2-codex',
-  llmMaxTokens: input.llmMaxTokens ?? 4096,
-  startingEquity: input.startingEquity ?? 100000,
-  optionsEnabled: input.optionsEnabled ?? false,
-  optionsMinConfidence: input.optionsMinConfidence ?? 0.75,
-  optionsMaxPctPerTrade: input.optionsMaxPctPerTrade ?? 2,
-  optionsMinDte: input.optionsMinDte ?? 7,
-  optionsMaxDte: input.optionsMaxDte ?? 45,
-  optionsTargetDelta: input.optionsTargetDelta ?? 0.35,
-  optionsMaxPositions: input.optionsMaxPositions ?? 3,
-  optionsStopLossPct: input.optionsStopLossPct ?? 50,
-  optionsTakeProfitPct: input.optionsTakeProfitPct ?? 100,
-  cryptoEnabled: input.cryptoEnabled ?? false,
-  cryptoSymbols: input.cryptoSymbols ?? ['BTC/USD', 'ETH/USD', 'SOL/USD'],
-  cryptoMomentumThreshold: input.cryptoMomentumThreshold ?? 2.0,
-  cryptoMaxPositionValue: input.cryptoMaxPositionValue ?? 1000,
-  cryptoTakeProfitPct: input.cryptoTakeProfitPct ?? 10,
-  cryptoStopLossPct: input.cryptoStopLossPct ?? 5,
-  stalePositionEnabled: input.stalePositionEnabled ?? true,
-  staleMaxHoldDays: input.staleMaxHoldDays ?? 3,
-  staleMinGainPct: input.staleMinGainPct ?? 5,
-  staleSocialVolumeDecay: input.staleSocialVolumeDecay ?? 0.3,
-  staleNoMentionsHours: input.staleNoMentionsHours ?? 8,
-})
+const normalizeConfig = (input: Config): Config => {
+  const defaults = withTradingConfigDefaults()
+  return {
+    ...input,
+    sellSentimentThreshold: input.sellSentimentThreshold ?? defaults.sellSentimentThreshold,
+    dataPollIntervalMs: input.dataPollIntervalMs ?? defaults.dataPollIntervalMs,
+    analystIntervalMs: input.analystIntervalMs ?? defaults.analystIntervalMs,
+    llmAnalystModel: input.llmAnalystModel ?? defaults.llmAnalystModel,
+    llmMaxTokens: input.llmMaxTokens ?? defaults.llmMaxTokens,
+    startingEquity: input.startingEquity ?? defaults.startingEquity,
+    optionsEnabled: input.optionsEnabled ?? defaults.optionsEnabled,
+    optionsMinConfidence: input.optionsMinConfidence ?? defaults.optionsMinConfidence,
+    optionsMaxPctPerTrade: input.optionsMaxPctPerTrade ?? defaults.optionsMaxPctPerTrade,
+    optionsMinDte: input.optionsMinDte ?? defaults.optionsMinDte,
+    optionsMaxDte: input.optionsMaxDte ?? defaults.optionsMaxDte,
+    optionsTargetDelta: input.optionsTargetDelta ?? defaults.optionsTargetDelta,
+    optionsMaxPositions: input.optionsMaxPositions ?? defaults.optionsMaxPositions,
+    optionsStopLossPct: input.optionsStopLossPct ?? defaults.optionsStopLossPct,
+    optionsTakeProfitPct: input.optionsTakeProfitPct ?? defaults.optionsTakeProfitPct,
+    cryptoEnabled: input.cryptoEnabled ?? defaults.cryptoEnabled,
+    cryptoSymbols: input.cryptoSymbols ?? defaults.cryptoSymbols,
+    cryptoMomentumThreshold: input.cryptoMomentumThreshold ?? defaults.cryptoMomentumThreshold,
+    cryptoMaxPositionValue: input.cryptoMaxPositionValue ?? defaults.cryptoMaxPositionValue,
+    cryptoTakeProfitPct: input.cryptoTakeProfitPct ?? defaults.cryptoTakeProfitPct,
+    cryptoStopLossPct: input.cryptoStopLossPct ?? defaults.cryptoStopLossPct,
+    stalePositionEnabled: input.stalePositionEnabled ?? defaults.stalePositionEnabled,
+    staleMaxHoldDays: input.staleMaxHoldDays ?? defaults.staleMaxHoldDays,
+    staleMinGainPct: input.staleMinGainPct ?? defaults.staleMinGainPct,
+    staleSocialVolumeDecay: input.staleSocialVolumeDecay ?? defaults.staleSocialVolumeDecay,
+    staleNoMentionsHours: input.staleNoMentionsHours ?? defaults.staleNoMentionsHours,
+  }
+}
 
 export function SettingsModal({ isOpen, onClose, config, onSave }: SettingsModalProps) {
   const [formData, setFormData] = useState<Config>(() => normalizeConfig(config))
@@ -287,10 +292,11 @@ export function SettingsModal({ isOpen, onClose, config, onSave }: SettingsModal
                   value={formData.llmModel}
                   onChange={(e) => handleChange('llmModel', e.target.value)}
                 >
-                  <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
-                  <option value="openai/gpt-5.2-codex">GPT 5.2 Codex</option>
-                  <option value="xai/grok-4.1-fast-reasoning">Grok 4.1</option>
-                  <option value="deepseek/deepseek-v3.2-thinking">DeepSeek 3.2</option>
+                  {LLM_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -303,10 +309,11 @@ export function SettingsModal({ isOpen, onClose, config, onSave }: SettingsModal
                   value={formData.llmAnalystModel}
                   onChange={(e) => handleChange('llmAnalystModel', e.target.value)}
                 >
-                  <option value="openai/gpt-5.2-codex">GPT 5.2 Codex</option>
-                  <option value="openai/gpt-4o">GPT-4o</option>
-                  <option value="openai/gpt-4o-mini">GPT-4o mini</option>
-                  <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
+                  {LLM_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

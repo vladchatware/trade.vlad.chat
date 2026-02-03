@@ -1,6 +1,5 @@
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
-import { upsertPositionEntry } from './lib/positionEntries'
 
 export const getAll = query({
   args: {},
@@ -35,7 +34,7 @@ export const updateFromWebSocket = mutation({
       .withIndex('by_symbol', (q) => q.eq('symbol', args.symbol))
       .first()
 
-    const positionData = {
+    const payload = {
       symbol: args.symbol,
       qty: args.qty,
       avgEntryPrice: args.avgEntryPrice,
@@ -47,17 +46,12 @@ export const updateFromWebSocket = mutation({
     }
 
     if (existing) {
-      await ctx.db.patch(existing._id, positionData)
-    } else {
-      await ctx.db.insert('positions', positionData)
+      await ctx.db.patch(existing._id, payload)
+      return { updated: true }
     }
 
-    await upsertPositionEntry(ctx, {
-      symbol: args.symbol,
-      qty: args.qty,
-      avgEntryPrice: args.avgEntryPrice,
-      currentPrice: args.currentPrice,
-    })
+    await ctx.db.insert('positions', payload)
+    return { updated: false }
   },
 })
 
@@ -67,12 +61,13 @@ export const cleanupClosed = mutation({
   },
   handler: async (ctx, args) => {
     const active = new Set(args.activeSymbols)
-    const entries = await ctx.db.query('positionEntries').collect()
-    let entriesDeleted = 0
-    for (const entry of entries) {
-      if (!active.has(entry.symbol)) {
-        await ctx.db.delete(entry._id)
-        entriesDeleted += 1
+    const positions = await ctx.db.query('positions').collect()
+    let deleted = 0
+
+    for (const position of positions) {
+      if (!active.has(position.symbol)) {
+        await ctx.db.delete(position._id)
+        deleted += 1
       }
     }
 
@@ -85,6 +80,6 @@ export const cleanupClosed = mutation({
       }
     }
 
-    return { entriesDeleted, stalenessDeleted }
+    return { deleted, stalenessDeleted }
   },
 })

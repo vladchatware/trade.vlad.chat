@@ -1,10 +1,52 @@
 import { v } from 'convex/values'
+import { withTradingConfigDefaults } from '../shared/tradingConfig'
 import { mutation, query } from './_generated/server'
+
+function defaultsForStorage() {
+  const defaults = withTradingConfigDefaults()
+  return {
+    maxPositionValue: defaults.maxPositionValue,
+    maxPositions: defaults.maxPositions,
+    minSentimentScore: defaults.minSentimentScore,
+    minAnalystConfidence: defaults.minAnalystConfidence,
+    sellSentimentThreshold: defaults.sellSentimentThreshold,
+    takeProfitPct: defaults.takeProfitPct,
+    stopLossPct: defaults.stopLossPct,
+    positionSizePctOfCash: defaults.positionSizePctOfCash,
+    dataPollIntervalMs: defaults.dataPollIntervalMs,
+    analystIntervalMs: defaults.analystIntervalMs,
+    llmModel: defaults.llmModel,
+    llmAnalystModel: defaults.llmAnalystModel,
+    llmMaxTokens: defaults.llmMaxTokens,
+    cryptoEnabled: defaults.cryptoEnabled,
+    cryptoSymbols: defaults.cryptoSymbols,
+    cryptoMomentumThreshold: defaults.cryptoMomentumThreshold,
+    cryptoMaxPositionValue: defaults.cryptoMaxPositionValue,
+    cryptoTakeProfitPct: defaults.cryptoTakeProfitPct,
+    cryptoStopLossPct: defaults.cryptoStopLossPct,
+    optionsEnabled: defaults.optionsEnabled,
+    optionsMaxPctPerTrade: defaults.optionsMaxPctPerTrade,
+    optionsMinConfidence: defaults.optionsMinConfidence,
+    optionsMinDte: defaults.optionsMinDte,
+    optionsMaxDte: defaults.optionsMaxDte,
+    optionsTargetDelta: defaults.optionsTargetDelta,
+    optionsMaxPositions: defaults.optionsMaxPositions,
+    optionsStopLossPct: defaults.optionsStopLossPct,
+    optionsTakeProfitPct: defaults.optionsTakeProfitPct,
+    stalePositionEnabled: defaults.stalePositionEnabled,
+    staleMaxHoldDays: defaults.staleMaxHoldDays,
+    staleMinGainPct: defaults.staleMinGainPct,
+    staleSocialVolumeDecay: defaults.staleSocialVolumeDecay,
+    staleNoMentionsHours: defaults.staleNoMentionsHours,
+    startingEquity: defaults.startingEquity,
+  }
+}
 
 export const get = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query('config').first()
+    const existing = await ctx.db.query('config').first()
+    return existing ?? { ...defaultsForStorage(), updatedAt: Date.now() }
   },
 })
 
@@ -46,47 +88,15 @@ export const update = mutation({
     startingEquity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const payload = { ...args, updatedAt: Date.now() }
     const existing = await ctx.db.query('config').first()
-    const config = {
-      ...args,
-      updatedAt: Date.now(),
-    }
-    if (existing) {
-      await ctx.db.patch(existing._id, config)
-    } else {
-      await ctx.db.insert('config', config)
-    }
-    return config
-  },
-})
 
-export const enableCrypto = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const existing = await ctx.db.query('config').first()
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        cryptoEnabled: true,
-        cryptoSymbols: ['BTC', 'ETH', 'SOL'],
-        updatedAt: Date.now(),
-      })
-      return { success: true, message: 'Crypto trading enabled (BTC, ETH, SOL)' }
+      await ctx.db.patch(existing._id, payload)
+      return { ...existing, ...payload }
     }
-    // Create default config with crypto enabled if none exists
-    await ctx.db.insert('config', {
-      maxPositionValue: 2000,
-      maxPositions: 3,
-      minSentimentScore: 0.7,
-      minAnalystConfidence: 0.8,
-      takeProfitPct: 10,
-      stopLossPct: 5,
-      positionSizePctOfCash: 20,
-      llmModel: 'moonshotai/kimi-k2.5',
-      llmAnalystModel: 'moonshotai/kimi-k2.5',
-      cryptoEnabled: true,
-      cryptoSymbols: ['BTC', 'ETH', 'SOL'],
-      updatedAt: Date.now(),
-    })
-    return { success: true, message: 'Created config with crypto enabled (BTC, ETH, SOL)' }
+
+    const id = await ctx.db.insert('config', payload)
+    return await ctx.db.get(id)
   },
 })

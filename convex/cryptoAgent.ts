@@ -1,75 +1,120 @@
 'use node'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { api } from './_generated/api'
+import type { Doc } from './_generated/dataModel'
 import { action } from './_generated/server'
-import { createAlpacaClient } from './providers/alpaca'
 
-// 24/7 crypto trading loop
+type CryptoSignal = {
+  symbol: string
+  sentiment?: number
+  momentum?: number
+  price?: number
+}
+
+export function pickCryptoEntry(
+  signals: CryptoSignal[],
+  heldSymbols: Set<string>
+): CryptoSignal | null {
+  return signals.filter((signal) => !heldSymbols.has(signal.symbol))[0] ?? null
+}
+
+export function cryptoExitReason(
+  unrealizedPlpc: number,
+  takeProfitPct: number,
+  stopLossPct: number
+): 'take_profit' | 'stop_loss' | null {
+  const plPct = unrealizedPlpc * 100
+  if (plPct >= takeProfitPct) return 'take_profit'
+  if (plPct <= -stopLossPct) return 'stop_loss'
+  return null
+}
+
 export const runCryptoTrading = action({
   args: {},
-  // biome-ignore lint/suspicious/noExplicitAny: Convex ctx typing is omitted here.
-  handler: async (ctx: any) => {
-    // @ts-ignore - config typing
-    // biome-ignore lint/suspicious/noExplicitAny: Config typing is handled dynamically.
-    const config: any = await ctx.runQuery(api.config.get)
+  handler: async (ctx): Promise<{ status: string; reason?: string; cryptoPositions?: number }> => {
+    const config = await ctx.runQuery(api.config.get, {})
 
     if (!config?.cryptoEnabled) {
-      return { status: 'skipped', reason: 'Crypto not enabled' }
+      return { status: 'skipped', reason: 'crypto_disabled' }
     }
 
-    const alpaca = createAlpacaClient()
-    const account = await alpaca.getAccount()
-    const positions = await alpaca.getPositions()
+    const [account, positions]: [Doc<'account'> | null, Doc<'positions'>[]] = await Promise.all([
+      ctx.runQuery(api.account.getAccount, {}),
+      ctx.runQuery(api.positions.getAll, {}),
+    ])
 
-    // Filter crypto positions
-    // @ts-ignore - parameter 'p' implicitly has 'any' type
-    const cryptoPositions = positions.filter((p) => config.cryptoSymbols?.includes(p.symbol))
+    const symbols = config.cryptoSymbols ?? []
+    const cryptoPositions = positions.filter((position) => symbols.includes(position.symbol))
 
-    // Check existing positions for exits
-    for (const pos of cryptoPositions) {
-      // @ts-ignore - Number.parseFloat argument type issues
-      const plPct = Number.parseFloat(pos.unrealized_plpc) * 100
+    const takeProfitPct = config.cryptoTakeProfitPct ?? 10
+    const stopLossPct = config.cryptoStopLossPct ?? 5
 
-      if (plPct >= (config.takeProfitPct || 10)) {
-        await ctx.runAction(api.tradingActions.closePosition, {
-          symbol: pos.symbol,
-        })
-      } else if (plPct <= -(config.stopLossPct || 5)) {
-        await ctx.runAction(api.tradingActions.closePosition, {
-          symbol: pos.symbol,
-        })
-      }
+    for (const position of cryptoPositions) {
+      const reason = cryptoExitReason(position.unrealizedPlpc, takeProfitPct, stopLossPct)
+      if (!reason) continue
+
+      await ctx.runAction(api.tradingActions.closePosition, { symbol: position.symbol })
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Crypto',
+        action: reason,
+        symbol: position.symbol,
+        detailsJson: JSON.stringify({ plPct: position.unrealizedPlpc * 100 }),
+      })
     }
 
-    // Look for new crypto opportunities
     const cryptoSignals = await ctx.runQuery(api.signalsQueries.getCrypto, {
-      symbols: config.cryptoSymbols || [],
-      minMomentum: config.cryptoMomentumThreshold || 0.02,
+      symbols,
+      minMomentum: config.cryptoMomentumThreshold ?? 0.02,
+      limit: 20,
     })
 
-    // @ts-ignore - parameter 'p' implicitly has 'any' type
-    const heldSymbols = new Set(cryptoPositions.map((p) => p.symbol))
-    // @ts-ignore - parameter 's' implicitly has 'any' type
-    const candidates = cryptoSignals.filter((s) => !heldSymbols.has(s.symbol))
+    const heldSymbols = new Set(cryptoPositions.map((position) => position.symbol))
+    const candidate = pickCryptoEntry(cryptoSignals, heldSymbols)
 
-    for (const signal of candidates.slice(0, 1)) {
-      const positionSize = Math.min(config.maxPositionValue || 1000, account.cash * 0.1)
-
-      const preview = await ctx.runAction(api.tradingActions.previewOrder, {
-        symbol: signal.symbol,
-        side: 'buy',
-        qty: positionSize / signal.price,
-        orderType: 'market',
-      })
-
-      if (preview.previewId) {
-        await ctx.runAction(api.tradingActions.submitOrder, {
-          previewId: preview.previewId,
-        })
-      }
+    if (!candidate?.price || candidate.price <= 0) {
+      return { status: 'success', cryptoPositions: cryptoPositions.length }
     }
+
+    const positionSize = Math.min(
+      config.cryptoMaxPositionValue ?? config.maxPositionValue,
+      (account?.cash ?? 0) * (config.positionSizePctOfCash / 100)
+    )
+    const qty = positionSize / candidate.price
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { status: 'success', cryptoPositions: cryptoPositions.length }
+    }
+
+    const preview = await ctx.runAction(api.tradingActions.previewOrder, {
+      symbol: candidate.symbol,
+      side: 'buy',
+      qty,
+      orderType: 'market',
+    })
+
+    if (!preview.policy.allowed || !preview.approvalToken) {
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Crypto',
+        action: 'crypto_buy_skipped',
+        symbol: candidate.symbol,
+        detailsJson: JSON.stringify({ reason: preview.policy.reason ?? 'policy_rejected' }),
+      })
+      return { status: 'success', cryptoPositions: cryptoPositions.length }
+    }
+
+    await ctx.runAction(api.tradingActions.submitOrder, {
+      previewId: preview.previewId,
+      approvalToken: preview.approvalToken,
+    })
+
+    await ctx.runMutation(api.activityLogs.create, {
+      agent: 'Crypto',
+      action: 'crypto_buy_submitted',
+      symbol: candidate.symbol,
+      detailsJson: JSON.stringify({
+        previewId: preview.previewId,
+        estimatedPrice: preview.estimatedPrice,
+      }),
+    })
 
     return { status: 'success', cryptoPositions: cryptoPositions.length }
   },

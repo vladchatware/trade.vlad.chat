@@ -80,7 +80,7 @@ describe('Dashboard', () => {
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText('MAHORAGA')).toBeInTheDocument()
+    expect(screen.getByText('trade.vlad.chat')).toBeInTheDocument()
     expect(screen.getByText('MARKET OPEN')).toBeInTheDocument()
     expect(screen.getByText('[CONFIG]')).toBeInTheDocument()
 

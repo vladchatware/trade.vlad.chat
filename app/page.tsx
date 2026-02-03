@@ -41,7 +41,6 @@ export default function Dashboard() {
   const portfolioHistory = usePortfolioHistory()
 
   const updateConfig = useMutation(api.config.update)
-  const seedDemoDataMutation = useMutation(api.demoData.seedDemoData)
 
   const positions: PositionRow[] = dbStatus?.positions || []
   const signals: SignalRow[] = dbStatus?.signals || []
@@ -83,20 +82,6 @@ export default function Dashboard() {
     }
   }
 
-  const handleSeedDemoData = async () => {
-    try {
-      const result = await seedDemoDataMutation()
-      if (result.success) {
-        alert(`✅ Demo data added!\n${result.message}`)
-      } else {
-        alert(result.message)
-      }
-    } catch (error) {
-      console.error('Failed to seed demo data:', error)
-      alert('Failed to add demo data. Please try again.')
-    }
-  }
-
   return (
     <div className="min-h-screen bg-hud-bg text-hud-text">
       <div className="max-w-[1920px] mx-auto p-4">
@@ -134,7 +119,6 @@ export default function Dashboard() {
               stalenessAnalysis={
                 dbStatus?.stalenessAnalysis as Record<string, StalenessAnalysis> | undefined
               }
-              onSeedDemoData={handleSeedDemoData}
             />
           </div>
 

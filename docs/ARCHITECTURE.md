@@ -2,19 +2,35 @@
 
 ## Canonical Stack
 
-1. **Next.js app** (`app/`, `components/`) for the operator dashboard
-2. **Next.js MCP endpoint** (`app/api/mcp/route.ts`) for tool serving via `mcp-handler`
-3. **Convex backend** (`convex/`) for state, trading data, and cron-based automation
-4. **Bun worker** (`worker/`) for continuous orchestration and agent loops
+1. **Next.js app** (`app/`, `components/`) for the operator dashboard (read from Convex)
+2. **Bun worker** (`worker/`) for market/account/signal ingestion into Convex (no trade decisioning)
+3. **Convex backend** (`convex/`) for state, risk controls, and cron-based trading agent execution
 
 ## Data/Control Flow
 
-1. Worker gathers signals and account context through MCP tools.
-2. Worker executes trade decisions via MCP tools.
+1. Worker reads broker + social data directly from upstream APIs and writes to Convex.
+2. Convex cron jobs run deterministic trading loops and the Convex Agent.
 3. Convex stores portfolio, logs, config, and derived status.
-4. Next.js subscribes to Convex in real time for dashboard updates.
+4. Next.js subscribes to Convex in real time for dashboard updates (read path only).
+
+## Convex Cron Jobs
+
+All cron jobs are registered in `convex/crons.ts`.
+
+- `run-trading` (`*/2 13-20 * * 1-5`) -> `api.tradingAgent.runTrading`
+- `run-crypto` (every 120s) -> `api.cryptoAgent.runCryptoTrading`
+- `agent-v2-cycle` (`*/10 13-20 * * 1-5`) -> `api.agent.runCycle`
+- `sec-edgar-ingest` (`*/5 13-20 * * 1-5`) -> `api.operations.ingestSecEdgar`
+- `market-open-prep` (`0 14 * * 1-5`) -> `api.operations.marketOpenPrep`
+- `market-close-cleanup` (`30 21 * * 1-5`) -> `api.operations.marketCloseCleanup`
+- `midnight-reset` (`0 5 * * *`) -> `api.operations.midnightReset`
+- `hourly-cache-refresh` (`0 * * * *`) -> `api.operations.hourlyCacheRefresh`
+- `cleanup-order-approvals` (every 15m) -> `api.orderApprovals.cleanupExpired`
+- `compute-staleness` (every 10m) -> `api.staleness.compute`
+- `overnight-activity-rollup` (`0 * * * *`) -> `api.overnight.computeOvernightActivity`
+- `premarket-plan` (`30 12 * * 1-5`) -> `api.overnight.generatePremarketPlan`
 
 ## Notes
 
-- The worker depends on `MCP_URL`, defaulting to `http://localhost:3000/api/mcp`.
-- MCP is now hosted in Next.js, so no separate Wrangler process is required for local development.
+- Worker requires Alpaca credentials and Convex URL for ingestion.
+- Next.js is not in the worker data path.

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { scrapeUrl } from './scraper'
+import { extractFinancialData, scrapeUrl } from './scraper'
 
 describe('scraper action', () => {
   beforeEach(() => {
@@ -25,7 +25,6 @@ describe('scraper action', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     const result = await scrapeUrl('https://finance.yahoo.com/test')
-
     expect(result.title).toBe('Example Title')
     expect(result.text).toContain('Headline')
     expect(result.domain).toBe('finance.yahoo.com')
@@ -34,5 +33,18 @@ describe('scraper action', () => {
 
   it('rejects disallowed domains', async () => {
     await expect(scrapeUrl('https://example.com/nope')).rejects.toThrow('Domain not allowed')
+  })
+
+  it('extracts financial artifacts', () => {
+    const result = extractFinancialData(
+      'AAPL earnings beat and raised guidance. Price target $250 with +12.5% upside. AAPL market cap high.',
+      'AAPL'
+    )
+    expect(result.mentions).toBe(2)
+    expect(result.priceReferences).toContain('$250')
+    expect(result.percentChanges).toContain('+12.5%')
+    expect(result.keyPhrases.some((phrase) => phrase.toLowerCase().includes('earnings beat'))).toBe(
+      true
+    )
   })
 })

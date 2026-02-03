@@ -3,7 +3,7 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'MAHORAGA Trading Dashboard',
+  title: 'trade.vlad.chat Trading Dashboard',
   description: 'Autonomous LLM-powered trading agent',
 }
 

@@ -1,4 +1,4 @@
-# MAHORAGA Agent Rules (Codex)
+# trade.vlad.chat Agent Rules (Codex)
 
 Use this file as the operating policy for autonomous or semi-autonomous Codex runs in this repository.
 
@@ -45,6 +45,27 @@ Every run must follow this cycle:
 - If a change increases risk, add a guardrail or test in the same cycle.
 - If uncertain, stop and present 2-3 concrete options with tradeoffs.
 
+## Architecture Guardrails (Keep It Tight)
+
+- Single source of truth for config defaults:
+  - Put canonical defaults in one shared module.
+  - Derive worker/UI/Convex shapes from that source; do not duplicate values.
+- Keep one persistence path for runtime config:
+  - Prefer Convex as durable source.
+  - Treat local JSON as temporary cache/fallback only, not a second authority.
+- Keep env loading minimal:
+  - Do not re-load `.env.local` manually when runtime already does it.
+  - Add loaders only for truly missing sources.
+
+## Complexity Budget
+
+- Prefer pure functions and small factories over classes unless lifecycle/state requires a class.
+- Do not introduce wrapper layers that only forward 1-2 calls.
+- Keep cyclomatic complexity low:
+  - Split branches into helpers early.
+  - Favor table-driven maps/strategies over nested conditionals.
+- If complexity increases, add a short note explaining why it is unavoidable.
+
 ## Safety Rules (Trading/Critical Logic)
 
 - Never merge behavior-changing trade execution logic without:
@@ -52,6 +73,10 @@ Every run must follow this cycle:
   - evidence from dry-run/simulation or equivalent test path.
 - Prefer fail-safe behavior when config/env is missing.
 - Keep kill-switch and risk controls intact; do not weaken guardrails in the same cycle as feature work.
+- Ensure decision/execution path is observable:
+  - log cycle start/skip reason,
+  - candidate selection reason,
+  - submit success/failure reason.
 
 ## Work-in-Progress Limits
 

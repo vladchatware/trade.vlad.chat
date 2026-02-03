@@ -1,73 +1,67 @@
+import { withTradingConfigDefaults } from '../shared/tradingConfig'
+import type { Doc } from './_generated/dataModel'
 import { query } from './_generated/server'
+import { type LlmStats, aggregateLlmStats } from './llmCosts'
 
-export const get = query({
-  args: {},
-  handler: async (ctx) => {
-    // Fetch data from database
-    const [
-      config,
-      riskState,
-      signals,
-      logs,
-      positions,
-      signalResearch,
-      marketClock,
-      portfolioSnapshots,
-      account,
-      positionEntries,
-      stalenessAnalysis,
-      overnightActivity,
-      premarketPlan,
-      twitterConfirmations,
-      positionHistory,
-    ] = await Promise.all([
-      ctx.db.query('config').first(),
-      ctx.db.query('riskState').first(),
-      ctx.db.query('signals').order('desc').take(20),
-      ctx.db.query('activityLogs').order('desc').take(50),
-      ctx.db.query('positions').collect(),
-      ctx.db.query('signalResearch').order('desc').take(20),
-      ctx.db.query('marketClock').first(),
-      ctx.db.query('portfolioSnapshots').order('desc').take(48),
-      ctx.db.query('account').first(),
-      ctx.db.query('positionEntries').collect(),
-      ctx.db.query('stalenessAnalysis').collect(),
-      ctx.db.query('overnightActivity').first(),
-      ctx.db.query('premarketPlans').order('desc').first(),
-      ctx.db.query('twitterConfirmations').order('desc').take(200),
-      ctx.db.query('positionHistory').collect(),
-    ])
+type DashboardStatus = {
+  account: Doc<'account'> | null
+  positions: Doc<'positions'>[]
+  signals: Doc<'signals'>[]
+  logs: Doc<'activityLogs'>[]
+  marketClock: Doc<'marketClock'> | null
+  config: Doc<'config'> | (ReturnType<typeof withTradingConfigDefaults> & { updatedAt: number })
+  llmStats: LlmStats
+  signalResearch: Doc<'signalResearch'>[]
+  positionEntries: Record<string, never>
+  stalenessAnalysis: Record<
+    string,
+    {
+      score: number
+      holdDays: number
+      gainPct: number
+      socialVolumeDecay: number
+      shouldExit: boolean
+      reasons: string[]
+      updatedAt: number
+    }
+  >
+  overnightActivity: Doc<'overnightActivity'> | null
+  premarketPlan: Doc<'premarketPlans'> | null
+  portfolioSnapshots: Doc<'portfolioSnapshots'>[]
+}
 
-    const positionEntriesBySymbol = positionEntries.reduce(
-      (acc, entry) => {
-        acc[entry.symbol] = {
-          entry_time: entry.entryTime,
-          entry_price: entry.entryPrice,
-          entry_sentiment: entry.entrySentiment,
-          entry_reason: entry.entryReason,
-          entry_social_volume: entry.entrySocialVolume ?? 0,
-          entry_sources: entry.entrySources ?? [],
-          peak_price: entry.peakPrice ?? entry.entryPrice,
-          peak_sentiment: entry.peakSentiment ?? entry.entrySentiment,
-        }
-        return acc
-      },
-      {} as Record<
-        string,
-        {
-          entry_time: number
-          entry_price: number
-          entry_sentiment: number
-          entry_reason: string
-          entry_social_volume: number
-          entry_sources: string[]
-          peak_price: number
-          peak_sentiment: number
-        }
-      >
-    )
+type StatusInput = {
+  account: Doc<'account'> | null
+  positions: Doc<'positions'>[]
+  signals: Doc<'signals'>[]
+  logs: Doc<'activityLogs'>[]
+  marketClock: Doc<'marketClock'> | null
+  config: Doc<'config'> | null
+  portfolioSnapshots: Doc<'portfolioSnapshots'>[]
+  stalenessAnalysis: Doc<'stalenessAnalysis'>[]
+  llmStats: LlmStats
+  signalResearch: Doc<'signalResearch'>[]
+  overnightActivity: Doc<'overnightActivity'> | null
+  premarketPlan: Doc<'premarketPlans'> | null
+}
 
-    const stalenessBySymbol = stalenessAnalysis.reduce(
+export function buildStatusResponse(input: StatusInput): DashboardStatus {
+  const defaults = withTradingConfigDefaults()
+
+  return {
+    account: input.account,
+    positions: input.positions,
+    signals: input.signals,
+    logs: input.logs,
+    marketClock: input.marketClock,
+    config: input.config ?? {
+      ...defaults,
+      updatedAt: Date.now(),
+    },
+    llmStats: input.llmStats,
+    signalResearch: input.signalResearch,
+    positionEntries: {},
+    stalenessAnalysis: input.stalenessAnalysis.reduce(
       (acc, item) => {
         acc[item.symbol] = {
           score: item.score,
@@ -76,80 +70,66 @@ export const get = query({
           socialVolumeDecay: item.socialVolumeDecay,
           shouldExit: item.shouldExit,
           reasons: item.reasons,
+          updatedAt: item.updatedAt,
         }
         return acc
       },
-      {} as Record<
-        string,
-        {
-          score: number
-          holdDays: number
-          gainPct: number
-          socialVolumeDecay: number
-          shouldExit: boolean
-          reasons: string[]
-        }
-      >
-    )
+      {} as DashboardStatus['stalenessAnalysis']
+    ),
+    overnightActivity: input.overnightActivity,
+    premarketPlan: input.premarketPlan,
+    portfolioSnapshots: input.portfolioSnapshots,
+  }
+}
 
-    const twitterConfirmationsBySymbol = twitterConfirmations.reduce(
-      (acc, confirmation) => {
-        acc[confirmation.symbol] = confirmation
-        return acc
-      },
-      {} as Record<string, (typeof twitterConfirmations)[number]>
-    )
-
-    const positionHistoryBySymbol = positionHistory.reduce(
-      (acc, history) => {
-        acc[history.symbol] = {
-          symbol: history.symbol,
-          prices: history.prices,
-          timestamps: history.timestamps,
-        }
-        return acc
-      },
-      {} as Record<string, { symbol: string; prices: number[]; timestamps: number[] }>
-    )
-
-    // Calculate LLM cost stats from tool logs
-    const llmLogs = await ctx.db
-      .query('toolLogs')
-      .filter((q) => q.eq(q.field('toolName'), 'llm-completion'))
-      .order('desc')
-      .take(1000)
-
-    const llmStats = llmLogs.reduce(
-      (acc, log) => {
-        const output = JSON.parse(log.outputJson || '{}')
-        return {
-          totalUsd: acc.totalUsd + (output.cost_usd || 0),
-          calls: acc.calls + 1,
-          tokensIn: acc.tokensIn + (output.tokens_in || 0),
-          tokensOut: acc.tokensOut + (output.tokens_out || 0),
-        }
-      },
-      { totalUsd: 0, calls: 0, tokensIn: 0, tokensOut: 0 }
-    )
-
-    return {
-      config,
-      riskState,
+export const get = query({
+  args: {},
+  handler: async (ctx): Promise<DashboardStatus> => {
+    const [
+      account,
+      positions,
       signals,
       logs,
-      positions,
-      signalResearch,
       marketClock,
+      config,
       portfolioSnapshots,
-      llmStats,
-      account,
-      startingEquity: config?.startingEquity || 100000,
+      stalenessAnalysis,
+      llmLogs,
+      signalResearch,
       overnightActivity,
       premarketPlan,
-      positionEntries: positionEntriesBySymbol,
-      stalenessAnalysis: stalenessBySymbol,
-      twitterConfirmations: twitterConfirmationsBySymbol,
-      positionHistory: positionHistoryBySymbol,
-    }
+    ] = await Promise.all([
+      ctx.db.query('account').first(),
+      ctx.db.query('positions').collect(),
+      ctx.db.query('signals').withIndex('by_timestamp').order('desc').take(25),
+      ctx.db.query('activityLogs').withIndex('by_timestamp').order('desc').take(60),
+      ctx.db.query('marketClock').first(),
+      ctx.db.query('config').first(),
+      ctx.db.query('portfolioSnapshots').withIndex('by_timestamp').order('desc').take(120),
+      ctx.db.query('stalenessAnalysis').collect(),
+      ctx.db
+        .query('toolLogs')
+        .withIndex('by_tool', (q) => q.eq('toolName', 'llm-completion'))
+        .order('desc')
+        .take(1000),
+      ctx.db.query('signalResearch').withIndex('by_timestamp').order('desc').take(20),
+      ctx.db.query('overnightActivity').first(),
+      ctx.db.query('premarketPlans').withIndex('by_timestamp').order('desc').first(),
+    ])
+
+    return buildStatusResponse({
+      account,
+      positions,
+      signals,
+      logs,
+      marketClock,
+      config,
+      portfolioSnapshots: portfolioSnapshots.reverse(),
+      stalenessAnalysis,
+      llmStats: aggregateLlmStats(llmLogs),
+      signalResearch,
+      overnightActivity,
+      premarketPlan,
+    })
   },
 })

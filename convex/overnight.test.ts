@@ -38,7 +38,7 @@ describe('overnight helpers', () => {
       { verdict: 'BUY', confidence: 0.75, reasoning: 'Setup', symbol: 'MSFT' },
       { verdict: 'SKIP', confidence: 0.8, reasoning: 'Nope', symbol: 'TSLA' },
     ]
-    const plan = buildPremarketPlan(signals, research, 1234)
+    const plan = buildPremarketPlan(signals, research, 1_234)
 
     expect(plan.marketOutlook).toContain('Bullish')
     expect(plan.recommendations.length).toBe(2)

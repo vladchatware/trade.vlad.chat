@@ -30,9 +30,8 @@ export const create = mutation({
 export const markUsed = mutation({
   args: { approvalId: v.id('orderApprovals') },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.approvalId, {
-      usedAt: Date.now(),
-    })
+    await ctx.db.patch(args.approvalId, { usedAt: Date.now() })
+    return { ok: true }
   },
 })
 

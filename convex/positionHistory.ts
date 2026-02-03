@@ -35,6 +35,7 @@ export const upsert = mutation({
         args.price,
         args.timestamp
       )
+
       await ctx.db.patch(existing._id, {
         prices,
         timestamps,

@@ -1,6 +1,6 @@
 # Worker Runtime
 
-The worker is a Bun process that runs the orchestration loop.
+The worker is a Bun process that ingests broker/social state into Convex.
 
 ## Entry Point
 
@@ -20,14 +20,12 @@ bun run worker:dev
 
 ## Required env
 
-- `MCP_URL` (default: `http://localhost:3000/api/mcp`)
+- `CONVEX_URL` (or `NEXT_PUBLIC_CONVEX_URL`)
 - `ALPACA_API_KEY`, `ALPACA_API_SECRET`, `ALPACA_PAPER`
-- `AI_GATEWAY_API_KEY`, `AI_GATEWAY_URL`
-- `KILL_SWITCH_SECRET`
 
 Optional:
 
-- `ALPACA_MCP_URL` for delegated Alpaca tool calls
+- none (worker reads upstream APIs directly)
 
 ## API
 

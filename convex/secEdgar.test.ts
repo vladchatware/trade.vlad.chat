@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLatestFilings, pollSecEdgar } from './secEdgar'
+import { getLatestFilings, getSecIngestSkipReason, parseAtomFeed, pollSecEdgar } from './secEdgar'
 
 const atomXml = `
   <feed>
@@ -16,9 +16,15 @@ const atomXml = `
   </feed>
 `
 
-describe('secEdgar actions', () => {
+describe('secEdgar helpers', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('parses atom entries', () => {
+    const entries = parseAtomFeed(atomXml)
+    expect(entries).toHaveLength(2)
+    expect(entries[0]).toMatchObject({ id: 'sec-1', form: '8-K', company: 'Apple Inc.' })
   })
 
   it('polls SEC atom feed', async () => {
@@ -28,7 +34,7 @@ describe('secEdgar actions', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    const events = await pollSecEdgar(mockFetch)
+    const events = await pollSecEdgar(mockFetch as unknown as typeof fetch)
     expect(events.length).toBe(2)
     expect(events[0].source).toBe('sec_edgar')
   })
@@ -53,10 +59,8 @@ describe('secEdgar actions', () => {
           tickers: ['AAPL'],
           filings: {
             recent: {
-              accessionNumber: ['0001', '0002'],
               filingDate: ['2025-01-02', '2025-01-01'],
               form: ['8-K', 'S-1'],
-              primaryDocument: ['doc1', 'doc2'],
             },
           },
         }),
@@ -65,9 +69,18 @@ describe('secEdgar actions', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     const items = await getLatestFilings('AAPL', 5, mockFetch)
-
     expect(items.length).toBe(1)
     expect(items[0].headline).toContain('Apple Inc.')
     expect(items[0].source).toBe('sec_edgar')
+  })
+
+  it('returns ingest skip reasons correctly', () => {
+    expect(getSecIngestSkipReason({ marketOpen: false, killSwitchActive: false })).toBe(
+      'market_closed'
+    )
+    expect(getSecIngestSkipReason({ marketOpen: true, killSwitchActive: true })).toBe(
+      'kill_switch_active'
+    )
+    expect(getSecIngestSkipReason({ marketOpen: true, killSwitchActive: false })).toBeNull()
   })
 })

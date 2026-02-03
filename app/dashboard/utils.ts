@@ -1,16 +1,42 @@
+import { withTradingConfigDefaults } from '@/shared/tradingConfig'
 import type { Config } from './types'
 
+const baseDefaults = withTradingConfigDefaults()
+
 export const defaultConfig: Config = {
-  maxPositionValue: 2000,
-  maxPositions: 3,
-  minSentimentScore: 0.7,
-  minAnalystConfidence: 0.8,
-  takeProfitPct: 10,
-  stopLossPct: 5,
-  positionSizePctOfCash: 20,
-  llmModel: 'moonshotai/kimi-k2.5',
-  cryptoEnabled: false,
-  optionsEnabled: false,
+  maxPositionValue: baseDefaults.maxPositionValue,
+  maxPositions: baseDefaults.maxPositions,
+  minSentimentScore: baseDefaults.minSentimentScore,
+  minAnalystConfidence: baseDefaults.minAnalystConfidence,
+  takeProfitPct: baseDefaults.takeProfitPct,
+  stopLossPct: baseDefaults.stopLossPct,
+  positionSizePctOfCash: baseDefaults.positionSizePctOfCash,
+  llmModel: baseDefaults.llmModel,
+  llmAnalystModel: baseDefaults.llmAnalystModel,
+  llmMaxTokens: baseDefaults.llmMaxTokens,
+  dataPollIntervalMs: baseDefaults.dataPollIntervalMs,
+  analystIntervalMs: baseDefaults.analystIntervalMs,
+  startingEquity: baseDefaults.startingEquity,
+  cryptoEnabled: baseDefaults.cryptoEnabled,
+  cryptoSymbols: baseDefaults.cryptoSymbols,
+  cryptoMomentumThreshold: baseDefaults.cryptoMomentumThreshold,
+  cryptoMaxPositionValue: baseDefaults.cryptoMaxPositionValue,
+  cryptoTakeProfitPct: baseDefaults.cryptoTakeProfitPct,
+  cryptoStopLossPct: baseDefaults.cryptoStopLossPct,
+  optionsEnabled: baseDefaults.optionsEnabled,
+  optionsMaxPctPerTrade: baseDefaults.optionsMaxPctPerTrade,
+  optionsMinConfidence: baseDefaults.optionsMinConfidence,
+  optionsMinDte: baseDefaults.optionsMinDte,
+  optionsMaxDte: baseDefaults.optionsMaxDte,
+  optionsTargetDelta: baseDefaults.optionsTargetDelta,
+  optionsMaxPositions: baseDefaults.optionsMaxPositions,
+  optionsStopLossPct: baseDefaults.optionsStopLossPct,
+  optionsTakeProfitPct: baseDefaults.optionsTakeProfitPct,
+  stalePositionEnabled: baseDefaults.stalePositionEnabled,
+  staleMaxHoldDays: baseDefaults.staleMaxHoldDays,
+  staleMinGainPct: baseDefaults.staleMinGainPct,
+  staleSocialVolumeDecay: baseDefaults.staleSocialVolumeDecay,
+  staleNoMentionsHours: baseDefaults.staleNoMentionsHours,
 }
 
 export const positionColors = ['cyan', 'purple', 'yellow', 'blue', 'green'] as const
@@ -48,6 +74,12 @@ export function formatAction(action: string, detailsJson?: string): string {
     position_closed: 'Position Closed',
     take_profit: 'Take Profit',
     stop_loss: 'Stop Loss',
+    decision_cycle_start: 'Cycle Start',
+    decision_cycle_skipped: 'Cycle Skipped',
+    decision_no_candidate: 'No Candidate',
+    decision_candidate_selected: 'Candidate Selected',
+    decision_buy_submitted: 'Buy Submitted',
+    decision_buy_failed: 'Buy Failed',
   }
 
   let text = actionNames[action] || action
@@ -61,6 +93,12 @@ export function formatAction(action: string, detailsJson?: string): string {
       if (details.plPct !== undefined) {
         const sign = details.plPct >= 0 ? '+' : ''
         text += ` · ${sign}${details.plPct.toFixed(2)}%`
+      }
+      if (typeof details.sentiment === 'number') {
+        text += ` · ${(details.sentiment * 100).toFixed(0)}%`
+      }
+      if (typeof details.reason === 'string' && details.reason.length > 0) {
+        text += ` · ${details.reason.slice(0, 48)}`
       }
     } catch {
       // ignore invalid JSON

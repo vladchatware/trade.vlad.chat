@@ -1,3 +1,5 @@
+'use node'
+
 import { v } from 'convex/values'
 import { action } from './_generated/server'
 import { createAlpacaClient } from './providers/alpaca'
@@ -27,6 +29,6 @@ export const get = action({
   handler: async (_ctx, args) => {
     const timeframe = args.timeframe ?? '1Day'
     const limit = args.limit ?? 250
-    return fetchTechnicals(args.symbol, timeframe, limit)
+    return await fetchTechnicals(args.symbol, timeframe, limit)
   },
 })

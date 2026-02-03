@@ -1,3 +1,5 @@
+'use node'
+
 import { v } from 'convex/values'
 import { action } from './_generated/server'
 
@@ -61,21 +63,17 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
 
     let html = await response.text()
     let truncated = false
-
     if (html.length > MAX_CONTENT_SIZE) {
       html = html.slice(0, MAX_CONTENT_SIZE)
       truncated = true
     }
 
     const parsed = new URL(url)
-    const title = extractTitle(html)
-    const text = extractText(html)
-
     return {
       url,
       domain: parsed.hostname,
-      title,
-      text: text.slice(0, 50000),
+      title: extractTitle(html),
+      text: extractText(html).slice(0, 50_000),
       timestamp: new Date().toISOString(),
       truncated,
     }
@@ -91,7 +89,7 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
 export const scrape = action({
   args: { url: v.string() },
   handler: async (_ctx, args): Promise<ScrapeResult> => {
-    return scrapeUrl(args.url)
+    return await scrapeUrl(args.url)
   },
 })
 
@@ -102,20 +100,16 @@ function extractTitle(html: string): string {
 
 function extractText(html: string): string {
   let text = html
-
   text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
   text = text.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, ' ')
   text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, ' ')
   text = text.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, ' ')
   text = text.replace(/<!--[\s\S]*?-->/g, ' ')
-
   text = text.replace(/<[^>]+>/g, ' ')
   text = decodeHtmlEntities(text)
   text = text.replace(/\s+/g, ' ')
-  text = text.trim()
-
-  return text
+  return text.trim()
 }
 
 function decodeHtmlEntities(text: string): string {
@@ -160,19 +154,19 @@ export function extractFinancialData(
   const symbolRegex = new RegExp(`\\b${symbol}\\b`, 'gi')
   const mentions = (text.match(symbolRegex) || []).length
 
-  const priceRegex = /\\$[\\d,]+\\.?\\d*/g
+  const priceRegex = /\$[\d,]+\.?\d*/g
   const priceReferences = (text.match(priceRegex) || []).slice(0, 10)
 
-  const percentRegex = /[-+]?\\d+\\.?\\d*%/g
+  const percentRegex = /[-+]?\d+\.?\d*%/g
   const percentChanges = (text.match(percentRegex) || []).slice(0, 10)
 
   const keyPhrasePatterns = [
     /earnings (beat|miss|surprise)/gi,
     /revenue (growth|decline|increase|decrease)/gi,
     /guidance (raised|lowered|cut|increased)/gi,
-    /upgraded? to \\w+/gi,
-    /downgraded? to \\w+/gi,
-    /price target \\$[\\d,]+/gi,
+    /upgraded? to \w+/gi,
+    /downgraded? to \w+/gi,
+    /price target \$[\d,]+/gi,
     /market cap/gi,
     /pe ratio/gi,
   ]

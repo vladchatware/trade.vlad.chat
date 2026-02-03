@@ -1,20 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Mahoraga v1 - Simple Trading Agent (Bun worker)
+ * trade.vlad.chat v1 - Simple Trading Agent (Bun worker)
  *
- * Entry point that wires env, API server, and orchestrator.
+ * Entry point that wires API server and orchestrator.
  */
 
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { startDashboardAPI } from './agent/api'
-import { loadEnv } from './agent/env'
-import { SimpleOrchestrator } from './agent/orchestrator'
+import { createOrchestrator } from './agent/orchestrator'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-loadEnv(__dirname)
-
-const orchestrator = new SimpleOrchestrator()
+const orchestrator = createOrchestrator()
 startDashboardAPI(orchestrator)
 orchestrator.run().catch(console.error)

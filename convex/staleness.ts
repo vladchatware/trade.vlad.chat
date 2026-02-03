@@ -1,116 +1,172 @@
+import { withTradingConfigDefaults } from '../shared/tradingConfig'
+import type { Doc } from './_generated/dataModel'
 import { mutation } from './_generated/server'
 
-const DEFAULTS = {
-  enabled: true,
-  minHoldHours: 6,
-  maxHoldDays: 3,
-  minGainPct: 5,
-  midHoldDays: 1.5,
-  midMinGainPct: 2,
-  socialVolumeDecay: 0.3,
-  noMentionsHours: 8,
-  recentSignalHours: 6,
+const MIN_HOLD_HOURS = 6
+const MID_HOLD_DAYS = 1.5
+const MID_MIN_GAIN_PCT = 2
+const RECENT_SIGNAL_HOURS = 6
+
+type SignalStats = {
+  lastSeen: number
+  recentVolume: number
 }
 
-function clamp01(value: number) {
+type StalenessSettings = {
+  enabled: boolean
+  maxHoldDays: number
+  minGainPct: number
+  socialVolumeDecay: number
+  noMentionsHours: number
+}
+
+export type StalenessResult = {
+  score: number
+  holdDays: number
+  gainPct: number
+  socialVolumeDecay: number
+  shouldExit: boolean
+  reasons: string[]
+}
+
+export function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
+}
+
+export function getStalenessSettings(config: Doc<'config'> | null): StalenessSettings {
+  const defaults = withTradingConfigDefaults()
+  return {
+    enabled: config?.stalePositionEnabled ?? defaults.stalePositionEnabled,
+    maxHoldDays: config?.staleMaxHoldDays ?? defaults.staleMaxHoldDays,
+    minGainPct: config?.staleMinGainPct ?? defaults.staleMinGainPct,
+    socialVolumeDecay: config?.staleSocialVolumeDecay ?? defaults.staleSocialVolumeDecay,
+    noMentionsHours: config?.staleNoMentionsHours ?? defaults.staleNoMentionsHours,
+  }
+}
+
+export function analyzePositionStaleness(params: {
+  now: number
+  trackedSince: number
+  currentPrice: number
+  avgEntryPrice: number
+  entrySocialVolume: number
+  signalStats: SignalStats | undefined
+  settings: StalenessSettings
+}): StalenessResult {
+  const holdHours = (params.now - params.trackedSince) / 3_600_000
+  const holdDays = holdHours / 24
+  const gainPct =
+    params.avgEntryPrice > 0
+      ? ((params.currentPrice - params.avgEntryPrice) / params.avgEntryPrice) * 100
+      : 0
+  const lastSeen = params.signalStats?.lastSeen ?? params.trackedSince
+  const hoursSinceMention = (params.now - lastSeen) / 3_600_000
+  const recentVolume = params.signalStats?.recentVolume ?? 0
+  const baselineVolume = params.entrySocialVolume
+  const volumeDecay = baselineVolume > 0 ? recentVolume / baselineVolume : 1
+
+  if (holdHours < MIN_HOLD_HOURS) {
+    return {
+      score: 0,
+      holdDays,
+      gainPct,
+      socialVolumeDecay: volumeDecay,
+      shouldExit: false,
+      reasons: [],
+    }
+  }
+
+  const reasons: string[] = []
+  let score = 0
+
+  if (holdDays >= params.settings.maxHoldDays && gainPct < params.settings.minGainPct) {
+    reasons.push('Max hold days exceeded with insufficient gains')
+    score += 0.35
+  }
+
+  if (holdDays >= MID_HOLD_DAYS && gainPct < MID_MIN_GAIN_PCT) {
+    reasons.push('Mid-hold period with weak gains')
+    score += 0.2
+  }
+
+  if (volumeDecay <= params.settings.socialVolumeDecay) {
+    reasons.push('Social volume decay below threshold')
+    score += 0.25
+  }
+
+  if (hoursSinceMention >= params.settings.noMentionsHours) {
+    reasons.push('No recent mentions')
+    score += 0.2
+  }
+
+  return {
+    score: clamp01(score),
+    holdDays,
+    gainPct,
+    socialVolumeDecay: volumeDecay,
+    shouldExit: reasons.length > 0,
+    reasons,
+  }
 }
 
 export const compute = mutation({
   args: {},
   handler: async (ctx) => {
-    if (!DEFAULTS.enabled) {
+    const [config, positions] = await Promise.all([
+      ctx.db.query('config').first(),
+      ctx.db.query('positions').collect(),
+    ])
+    const settings = getStalenessSettings(config)
+    if (!settings.enabled) {
       return { success: true, message: 'Staleness disabled' }
     }
-
-    const now = Date.now()
-    const positions = await ctx.db.query('positions').collect()
     if (positions.length === 0) {
       return { success: true, message: 'No positions to analyze' }
     }
 
-    const entries = await ctx.db.query('positionEntries').collect()
-    const entryBySymbol = new Map(entries.map((entry) => [entry.symbol, entry]))
-
+    const now = Date.now()
     const recentSignals = await ctx.db
       .query('signals')
-      .filter((q) => q.gte(q.field('timestamp'), now - DEFAULTS.recentSignalHours * 3600000))
+      .withIndex('by_timestamp', (q) => q.gte('timestamp', now - RECENT_SIGNAL_HOURS * 3_600_000))
       .collect()
-
-    const signalStats = new Map<string, { lastSeen: number; recentVolume: number }>()
-
+    const signalStats = new Map<string, SignalStats>()
     for (const signal of recentSignals) {
       const existing = signalStats.get(signal.symbol)
-      const lastSeen = Math.max(existing?.lastSeen ?? 0, signal.timestamp)
-      const recentVolume = (existing?.recentVolume ?? 0) + (signal.volume || 0)
-      signalStats.set(signal.symbol, { lastSeen, recentVolume })
+      signalStats.set(signal.symbol, {
+        lastSeen: Math.max(existing?.lastSeen ?? 0, signal.timestamp),
+        recentVolume: (existing?.recentVolume ?? 0) + (signal.volume || 0),
+      })
     }
+
+    const existingItems = await ctx.db.query('stalenessAnalysis').collect()
+    const existingBySymbol = new Map(existingItems.map((item) => [item.symbol, item]))
 
     let updated = 0
     for (const position of positions) {
-      const entry = entryBySymbol.get(position.symbol)
-      if (!entry) {
-        continue
-      }
-
-      const holdHours = (now - entry.entryTime) / 3600000
-      const holdDays = holdHours / 24
-      if (holdHours < DEFAULTS.minHoldHours) {
-        continue
-      }
-
-      const gainPct =
-        entry.entryPrice > 0
-          ? ((position.currentPrice - entry.entryPrice) / entry.entryPrice) * 100
-          : 0
-
+      const existing = existingBySymbol.get(position.symbol)
+      const trackedSince = existing?.trackedSince ?? position.updatedAt ?? now
       const stats = signalStats.get(position.symbol)
-      const lastSeen = stats?.lastSeen ?? entry.entryTime
-      const hoursSinceMention = (now - lastSeen) / 3600000
-
-      const entryVolume = entry.entrySocialVolume ?? 0
-      const recentVolume = stats?.recentVolume ?? 0
-      const volumeDecay = entryVolume > 0 ? recentVolume / entryVolume : 1
-
-      const reasons: string[] = []
-      let score = 0
-
-      if (holdDays >= DEFAULTS.maxHoldDays && gainPct < DEFAULTS.minGainPct) {
-        reasons.push('Max hold days exceeded with insufficient gains')
-        score += 0.35
-      }
-
-      if (holdDays >= DEFAULTS.midHoldDays && gainPct < DEFAULTS.midMinGainPct) {
-        reasons.push('Mid-hold period with weak gains')
-        score += 0.2
-      }
-
-      if (volumeDecay <= DEFAULTS.socialVolumeDecay) {
-        reasons.push('Social volume decay below threshold')
-        score += 0.25
-      }
-
-      if (hoursSinceMention >= DEFAULTS.noMentionsHours) {
-        reasons.push('No recent mentions')
-        score += 0.2
-      }
-
-      const shouldExit = reasons.length > 0
-      const normalizedScore = clamp01(score)
-
-      const existing = await ctx.db
-        .query('stalenessAnalysis')
-        .withIndex('by_symbol', (q) => q.eq('symbol', position.symbol))
-        .first()
+      const entrySocialVolume = existing?.entrySocialVolume ?? stats?.recentVolume ?? 0
+      const analysis = analyzePositionStaleness({
+        now,
+        trackedSince,
+        currentPrice: position.currentPrice,
+        avgEntryPrice: position.avgEntryPrice,
+        entrySocialVolume,
+        signalStats: stats,
+        settings,
+      })
 
       const payload = {
         symbol: position.symbol,
-        score: normalizedScore,
-        holdDays,
-        gainPct,
-        socialVolumeDecay: volumeDecay,
-        shouldExit,
-        reasons,
+        score: analysis.score,
+        holdDays: analysis.holdDays,
+        gainPct: analysis.gainPct,
+        socialVolumeDecay: analysis.socialVolumeDecay,
+        shouldExit: analysis.shouldExit,
+        reasons: analysis.reasons,
+        trackedSince,
+        entrySocialVolume,
         updatedAt: now,
       }
 
@@ -119,7 +175,6 @@ export const compute = mutation({
       } else {
         await ctx.db.insert('stalenessAnalysis', payload)
       }
-
       updated += 1
     }
 

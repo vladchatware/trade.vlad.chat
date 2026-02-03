@@ -20,8 +20,7 @@ bun install
 ### 2) Configure env
 
 Create:
-- `.env.local` for Next/Convex + MCP env
-- `.dev.vars` for worker runtime env (optional if mirrored in `.env.local`)
+- `.env.local` for Next/Convex/worker + MCP env
 
 Required keys (minimum):
 

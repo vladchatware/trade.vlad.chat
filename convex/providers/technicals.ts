@@ -92,11 +92,9 @@ export function calculateMACD(
 ): { macd: number; signal: number; histogram: number } | null {
   const ema12 = calculateEMA(prices, 12)
   const ema26 = calculateEMA(prices, 26)
-
   if (ema12 === null || ema26 === null) return null
 
   const macdLine = ema12 - ema26
-
   const macdValues: number[] = []
   let tempEma12 = prices.slice(0, 12).reduce((a, b) => a + b, 0) / 12
   let tempEma26 = prices.slice(0, 26).reduce((a, b) => a + b, 0) / 26
@@ -132,7 +130,6 @@ export function calculateBollingerBands(
 
   const slice = prices.slice(-period)
   const middle = slice.reduce((a, b) => a + b, 0) / period
-
   const squaredDiffs = slice.map((p) => (p - middle) ** 2)
   const variance = squaredDiffs.reduce((a, b) => a + b, 0) / period
   const std = Math.sqrt(variance)
@@ -180,7 +177,6 @@ export function computeTechnicals(symbol: string, bars: Bar[]): TechnicalIndicat
   const volumes = bars.map((b) => b.v)
   const currentPrice = closes[closes.length - 1] ?? 0
   const currentVolume = volumes[volumes.length - 1] ?? 0
-
   const volumeSma = calculateSMA(volumes, 20)
   const relativeVolume = volumeSma && volumeSma > 0 ? currentVolume / volumeSma : null
 
@@ -265,7 +261,6 @@ export function detectSignals(technicals: TechnicalIndicators): Signal[] {
 
   if (technicals.sma_20 !== null && technicals.sma_50 !== null && technicals.price > 0) {
     const crossoverStrength = Math.abs(technicals.sma_20 - technicals.sma_50) / technicals.price
-
     if (technicals.sma_20 > technicals.sma_50) {
       signals.push({
         type: 'golden_cross_active',

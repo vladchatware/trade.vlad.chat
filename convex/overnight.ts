@@ -8,12 +8,11 @@ type ResearchRow = {
   reasoning: string
   symbol: string
 }
-type ConfirmationRow = unknown
 
 export function buildOvernightActivity(
   signals: SignalRow[],
   research: ResearchRow[],
-  confirmations: ConfirmationRow[],
+  confirmations: unknown[],
   latestPlanTimestamp: number | null,
   since: number,
   now: number
@@ -34,7 +33,7 @@ export function buildOvernightActivity(
 export function buildPremarketPlan(signals: SignalRow[], research: ResearchRow[], now: number) {
   const avgSentiment =
     signals.length > 0
-      ? signals.reduce((sum, s) => sum + (s.sentiment || 0), 0) / signals.length
+      ? signals.reduce((sum, signal) => sum + (signal.sentiment || 0), 0) / signals.length
       : 0
 
   const marketOutlook =
@@ -49,7 +48,6 @@ export function buildPremarketPlan(signals: SignalRow[], research: ResearchRow[]
     .slice(0, 12)
 
   const highConvictionPlays = Array.from(new Set(candidates.map((item) => item.symbol))).slice(0, 5)
-
   const recommendations = candidates.map((item) => ({
     symbol: item.symbol,
     action: 'BUY' as const,
@@ -96,7 +94,7 @@ export const computeOvernightActivity = mutation({
         .query('twitterConfirmations')
         .withIndex('by_timestamp', (q) => q.gte('timestamp', since))
         .collect(),
-      ctx.db.query('premarketPlans').order('desc').first(),
+      ctx.db.query('premarketPlans').withIndex('by_timestamp').order('desc').first(),
     ])
 
     const payload = buildOvernightActivity(
@@ -139,7 +137,6 @@ export const generatePremarketPlan = mutation({
     ])
 
     const plan = buildPremarketPlan(signals, research, Date.now())
-
     const id = await ctx.db.insert('premarketPlans', plan)
     return { ...plan, id }
   },

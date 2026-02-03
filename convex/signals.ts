@@ -3,55 +3,34 @@
 import { api } from './_generated/api'
 import { action } from './_generated/server'
 
-// StockTwits API response types
-interface StockTwitsSymbol {
+export interface StockTwitsSymbol {
   symbol: string
   title: string
 }
 
-interface StockTwitsMessage {
+export interface StockTwitsMessage {
   entities?: {
     sentiment?: {
-      basic: string
+      basic?: string
     }
   }
 }
 
-// Fetch trending symbols from StockTwits
-async function getTrending(): Promise<StockTwitsSymbol[]> {
-  try {
-    const res = await fetch('https://api.stocktwits.com/api/2/trending/symbols.json')
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.symbols || []
-  } catch {
-    return []
-  }
+export type SentimentSummary = {
+  bullish: number
+  bearish: number
+  total: number
+  score: number
 }
 
-// Fetch message stream for a symbol
-async function getStream(symbol: string): Promise<StockTwitsMessage[]> {
-  try {
-    const res = await fetch(
-      `https://api.stocktwits.com/api/2/streams/symbol/${symbol}.json?limit=30`
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.messages || []
-  } catch {
-    return []
-  }
-}
-
-// Analyze sentiment from messages
-function analyzeSentiment(messages: StockTwitsMessage[]) {
+export function analyzeSentiment(messages: StockTwitsMessage[]): SentimentSummary {
   let bullish = 0
   let bearish = 0
 
-  for (const msg of messages) {
-    const sentiment = msg.entities?.sentiment?.basic
-    if (sentiment === 'Bullish') bullish++
-    else if (sentiment === 'Bearish') bearish++
+  for (const message of messages) {
+    const sentiment = message.entities?.sentiment?.basic
+    if (sentiment === 'Bullish') bullish += 1
+    if (sentiment === 'Bearish') bearish += 1
   }
 
   const total = messages.length
@@ -63,20 +42,49 @@ function analyzeSentiment(messages: StockTwitsMessage[]) {
   }
 }
 
-// StockTwits signal gathering
+export async function getTrendingSymbols(
+  fetchImpl: typeof fetch = fetch
+): Promise<StockTwitsSymbol[]> {
+  try {
+    const response = await fetchImpl('https://api.stocktwits.com/api/2/trending/symbols.json')
+    if (!response.ok) return []
+    const data = (await response.json()) as { symbols?: StockTwitsSymbol[] }
+    return data.symbols ?? []
+  } catch {
+    return []
+  }
+}
+
+export async function getSymbolStream(
+  symbol: string,
+  limit = 30,
+  fetchImpl: typeof fetch = fetch
+): Promise<StockTwitsMessage[]> {
+  try {
+    const response = await fetchImpl(
+      `https://api.stocktwits.com/api/2/streams/symbol/${symbol}.json?limit=${limit}`
+    )
+    if (!response.ok) return []
+    const data = (await response.json()) as { messages?: StockTwitsMessage[] }
+    return data.messages ?? []
+  } catch {
+    return []
+  }
+}
+
 export const gatherSignals = action({
   args: {},
   handler: async (ctx) => {
-    const signals = []
-    const trending = await getTrending()
+    const gathered: string[] = []
+    const trending = await getTrendingSymbols()
 
-    for (const sym of trending.slice(0, 10)) {
-      const messages = await getStream(sym.symbol)
+    for (const item of trending.slice(0, 10)) {
+      const messages = await getSymbolStream(item.symbol, 30)
       const sentiment = analyzeSentiment(messages)
 
       if (sentiment.total >= 5) {
         await ctx.runMutation(api.signalsQueries.create, {
-          symbol: sym.symbol,
+          symbol: item.symbol,
           source: 'stocktwits',
           sentiment: sentiment.score,
           volume: sentiment.total,
@@ -85,13 +93,12 @@ export const gatherSignals = action({
           reason: `StockTwits: ${sentiment.bullish}B/${sentiment.bearish}b (${(sentiment.score * 100).toFixed(0)}%)`,
           timestamp: Date.now(),
         })
-        signals.push(sym.symbol)
+        gathered.push(item.symbol)
       }
 
-      // Rate limit: 300ms delay between requests
       await new Promise((resolve) => setTimeout(resolve, 300))
     }
 
-    return { signalsGathered: signals.length, symbols: signals }
+    return { signalsGathered: gathered.length, symbols: gathered }
   },
 })

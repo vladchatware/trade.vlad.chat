@@ -1,181 +1,204 @@
 'use node'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { api } from './_generated/api'
+import type { Doc } from './_generated/dataModel'
 import { action } from './_generated/server'
-import { createAlpacaClient } from './providers/alpaca'
 
-// Main trading loop for market-hours equities execution
+type SignalCandidate = {
+  symbol: string
+  sentiment?: number
+  volume?: number
+  price?: number
+}
+
+export function calculatePositionSize(
+  maxPositionValue: number,
+  cash: number,
+  positionSizePctOfCash: number
+): number {
+  return Math.max(0, Math.min(maxPositionValue, cash * (positionSizePctOfCash / 100)))
+}
+
+export function selectBestCandidate(
+  signals: SignalCandidate[],
+  heldSymbols: Set<string>,
+  minSentimentScore: number
+): SignalCandidate | null {
+  return (
+    signals
+      .filter((signal) => (signal.sentiment ?? 0) >= minSentimentScore)
+      .filter((signal) => !heldSymbols.has(signal.symbol))[0] ?? null
+  )
+}
+
+export function classifyExit(
+  unrealizedPlpc: number | undefined,
+  takeProfitPct: number,
+  stopLossPct: number
+): 'take_profit' | 'stop_loss' | null {
+  const plPct = (unrealizedPlpc ?? 0) * 100
+  if (plPct >= takeProfitPct) return 'take_profit'
+  if (plPct <= -stopLossPct) return 'stop_loss'
+  return null
+}
+
 export const runTrading = action({
   args: {},
-  handler: async (ctx) => {
-    const alpaca = createAlpacaClient()
-    const config = await ctx.runQuery(api.config.get)
-    const riskState = await ctx.runQuery(api.riskState.get)
+  handler: async (ctx): Promise<{ status: string; reason?: string; positionsChecked?: number }> => {
+    const [config, riskState] = await Promise.all([
+      ctx.runQuery(api.config.get, {}),
+      ctx.runQuery(api.riskState.get, {}),
+    ])
 
     if (!config || riskState?.killSwitchActive) {
-      return { status: 'skipped', reason: 'Config missing or kill switch active' }
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'System',
+        action: 'decision_cycle_skipped',
+        detailsJson: JSON.stringify({
+          reason: !config ? 'config_missing' : 'kill_switch_active',
+        }),
+      })
+      return { status: 'skipped', reason: !config ? 'config_missing' : 'kill_switch_active' }
     }
 
-    type AlpacaPosition = {
-      symbol: string
-      unrealized_plpc?: string | number
-    }
-    type SignalCandidate = {
-      sentiment?: number
-      symbol: string
-      price?: number
-      volume?: number
-    }
+    const [account, positions, clock]: [
+      Doc<'account'> | null,
+      Doc<'positions'>[],
+      Doc<'marketClock'> | null,
+    ] = await Promise.all([
+      ctx.runQuery(api.account.getAccount, {}),
+      ctx.runQuery(api.positions.getAll, {}),
+      ctx.runQuery(api.marketClock.get, {}),
+    ])
 
-    // Fetch current state
-    const account = await alpaca.getAccount()
-    const positions = (await alpaca.getPositions()) as AlpacaPosition[]
-    const clock = await alpaca.getClock()
-
-    if (!clock.is_open) {
-      return { status: 'skipped', reason: 'Market closed' }
-    }
-
-    // Check positions for exits (stop-loss, take-profit)
-    for (const pos of positions) {
-      // @ts-ignore - various type errors
-      const plPct = Number.parseFloat(pos.unrealized_plpc) * 100
-
-      if (plPct >= config.takeProfitPct) {
-        await ctx.runAction(api.tradingActions.closePosition, {
-          symbol: pos.symbol,
-        })
-        await ctx.runMutation(api.activityLogs.create, {
-          agent: 'Executor',
-          action: 'take_profit',
-          symbol: pos.symbol,
-          details: { plPct },
-        })
-      } else if (plPct <= -config.stopLossPct) {
-        await ctx.runAction(api.tradingActions.closePosition, {
-          symbol: pos.symbol,
-        })
-        await ctx.runMutation(api.activityLogs.create, {
-          agent: 'Executor',
-          action: 'stop_loss',
-          symbol: pos.symbol,
-          details: { plPct },
-        })
-      }
+    if (!clock?.isOpen) {
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'System',
+        action: 'decision_cycle_skipped',
+        detailsJson: JSON.stringify({ reason: !clock ? 'clock_missing' : 'market_closed' }),
+      })
+      return { status: 'skipped', reason: !clock ? 'clock_missing' : 'market_closed' }
     }
 
-    // Look for buy opportunities
-    if (positions.length < config.maxPositions) {
-      const signals = (await ctx.runQuery(api.signalsQueries.getTop, {
-        limit: 5,
-      })) as SignalCandidate[]
-      // Filter by sentiment after fetching
-      const filteredSignals = signals.filter((s) => (s.sentiment ?? 0) >= config.minSentimentScore)
+    await ctx.runMutation(api.activityLogs.create, {
+      agent: 'System',
+      action: 'decision_cycle_start',
+      detailsJson: JSON.stringify({
+        positions: positions.length,
+        maxPositions: config.maxPositions,
+      }),
+    })
 
-      const heldSymbols = new Set(positions.map((p) => p.symbol))
-      const candidates = filteredSignals.filter((s) => !heldSymbols.has(s.symbol))
+    for (const position of positions) {
+      const exitReason = classifyExit(
+        position.unrealizedPlpc,
+        config.takeProfitPct,
+        config.stopLossPct
+      )
+      if (!exitReason) continue
 
-      const bestCandidate = candidates[0]
-      if (bestCandidate) {
-        const positionSize = Math.min(
-          config.maxPositionValue,
-          account.cash * (config.positionSizePctOfCash / 100)
-        )
-
-        const preview = await ctx.runAction(api.tradingActions.previewOrder, {
-          symbol: bestCandidate.symbol,
-          side: 'buy',
-          qty: bestCandidate.price ? positionSize / bestCandidate.price : 0,
-          orderType: 'market',
-        })
-
-        if (preview.previewId) {
-          await ctx.runAction(api.tradingActions.submitOrder, {
-            previewId: preview.previewId,
-          })
-        }
-      }
-    }
-
-    return { status: 'success', positionsChecked: positions.length }
-  },
-})
-
-export const gatherData = action({
-  args: {},
-  handler: async (ctx) => {
-    const alpaca = createAlpacaClient()
-    type AlpacaPosition = {
-      symbol: string
-      qty?: string | number
-      avg_entry_price?: string | number
-      current_price?: string | number
-      market_value?: string | number
-      unrealized_pl?: string | number
-      unrealized_plpc?: string | number
-    }
-
-    // Update positions in database
-    const positions = (await alpaca.getPositions()) as AlpacaPosition[]
-
-    for (const pos of positions) {
-      const positionData = {
-        symbol: pos.symbol,
-        qty: Number.parseFloat(String(pos.qty ?? 0)),
-        avgEntryPrice: Number.parseFloat(String(pos.avg_entry_price ?? 0)),
-        currentPrice: Number.parseFloat(String(pos.current_price ?? 0)),
-        marketValue: Number.parseFloat(String(pos.market_value ?? 0)),
-        unrealizedPl: Number.parseFloat(String(pos.unrealized_pl ?? 0)),
-        unrealizedPlpc: Number.parseFloat(String(pos.unrealized_plpc ?? 0)),
-      }
-
-      await ctx.runMutation(api.positions.updateFromWebSocket, positionData)
-
-      await ctx.runMutation(api.positionHistory.upsert, {
-        symbol: positionData.symbol,
-        price: positionData.currentPrice,
-        timestamp: Date.now(),
+      await ctx.runAction(api.tradingActions.closePosition, { symbol: position.symbol })
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Executor',
+        action: exitReason,
+        symbol: position.symbol,
+        detailsJson: JSON.stringify({ plPct: (position.unrealizedPlpc ?? 0) * 100 }),
       })
     }
 
-    // Remove stale entries for closed positions
-    const activeSymbols = positions.map((pos) => pos.symbol)
-    await ctx.runMutation(api.positions.cleanupClosed, { activeSymbols })
+    if (positions.length >= config.maxPositions) {
+      return { status: 'success', positionsChecked: positions.length }
+    }
 
-    // Fetch and store account data for real-time dashboard updates
-    const account = await alpaca.getAccount()
-    // @ts-ignore - Property 'equity' does not exist on type 'AlpacaAccount'
-    const equity = Number.parseFloat(account.equity)
-    // @ts-ignore - Property 'cash' does not exist on type 'AlpacaAccount'
-    const cash = Number.parseFloat(account.cash)
-    // @ts-ignore - Property 'buying_power' does not exist on type 'AlpacaAccount'
-    const buyingPower = Number.parseFloat(account.buying_power)
-    // @ts-ignore - Property 'portfolio_value' does not exist on type 'AlpacaAccount'
-    const portfolioValue = Number.parseFloat(account.portfolio_value)
+    const signals = await ctx.runQuery(api.signalsQueries.getTop, { limit: 5 })
+    const heldSymbols = new Set(positions.map((position) => position.symbol))
+    const candidate = selectBestCandidate(signals, heldSymbols, config.minSentimentScore)
 
-    // Update account data in database (real-time via WebSocket)
-    await ctx.runMutation(api.account.updateAccount, {
-      equity,
-      cash,
-      buyingPower,
-      portfolioValue,
+    if (!candidate) {
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Analyst',
+        action: 'decision_no_candidate',
+        detailsJson: JSON.stringify({
+          scanned: signals.length,
+          blockedByPositionLimit: positions.length >= config.maxPositions,
+        }),
+      })
+      return { status: 'success', positionsChecked: positions.length }
+    }
+
+    const positionSize = calculatePositionSize(
+      config.maxPositionValue,
+      account?.cash ?? 0,
+      config.positionSizePctOfCash
+    )
+
+    await ctx.runMutation(api.activityLogs.create, {
+      agent: 'Analyst',
+      action: 'decision_candidate_selected',
+      symbol: candidate.symbol,
+      detailsJson: JSON.stringify({
+        sentiment: candidate.sentiment ?? 0,
+        volume: candidate.volume ?? 0,
+        price: candidate.price ?? 0,
+        positionSize,
+        reason: 'top_ranked_signal_above_threshold',
+      }),
     })
 
-    // Create portfolio snapshot for chart history
-    const config = await ctx.runQuery(api.config.get)
-    const startingEquity = config?.startingEquity || 100000
-    const pl = equity - startingEquity
-    const plPct = (pl / startingEquity) * 100
+    const qty = candidate.price ? positionSize / candidate.price : 0
+    if (!Number.isFinite(qty) || qty <= 0) {
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Executor',
+        action: 'decision_buy_failed',
+        symbol: candidate.symbol,
+        detailsJson: JSON.stringify({ reason: 'invalid_qty_or_price' }),
+      })
+      return { status: 'success', positionsChecked: positions.length }
+    }
 
-    // Use mutation to insert snapshot (actions can't access ctx.db directly)
-    await ctx.runMutation(api.portfolio.createSnapshot, {
-      equity,
-      pl,
-      plPct,
-    })
+    try {
+      const preview = await ctx.runAction(api.tradingActions.previewOrder, {
+        symbol: candidate.symbol,
+        side: 'buy',
+        qty,
+        orderType: 'market',
+      })
 
-    return { positionsUpdated: positions.length, snapshotCreated: true }
+      if (!preview.policy.allowed || !preview.approvalToken) {
+        await ctx.runMutation(api.activityLogs.create, {
+          agent: 'Executor',
+          action: 'decision_buy_failed',
+          symbol: candidate.symbol,
+          detailsJson: JSON.stringify({ reason: preview.policy.reason ?? 'policy_rejected' }),
+        })
+        return { status: 'success', positionsChecked: positions.length }
+      }
+
+      await ctx.runAction(api.tradingActions.submitOrder, {
+        previewId: preview.previewId,
+        approvalToken: preview.approvalToken,
+      })
+
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Executor',
+        action: 'decision_buy_submitted',
+        symbol: candidate.symbol,
+        detailsJson: JSON.stringify({
+          previewId: preview.previewId,
+          estimatedPrice: preview.estimatedPrice,
+        }),
+      })
+    } catch (error) {
+      await ctx.runMutation(api.activityLogs.create, {
+        agent: 'Executor',
+        action: 'decision_buy_failed',
+        symbol: candidate.symbol,
+        detailsJson: JSON.stringify({
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      })
+    }
+
+    return { status: 'success', positionsChecked: positions.length }
   },
 })

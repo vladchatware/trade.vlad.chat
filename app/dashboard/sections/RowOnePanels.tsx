@@ -69,7 +69,6 @@ interface PositionsPanelProps {
   positionPriceHistories: Record<string, number[]>
   positionEntries?: Record<string, PositionEntry>
   stalenessAnalysis?: Record<string, StalenessAnalysis>
-  onSeedDemoData: () => void
 }
 
 export function PositionsPanel({
@@ -78,7 +77,6 @@ export function PositionsPanel({
   positionPriceHistories,
   positionEntries,
   stalenessAnalysis,
-  onSeedDemoData,
 }: PositionsPanelProps) {
   return (
     <Panel
@@ -87,12 +85,7 @@ export function PositionsPanel({
       className="h-full"
     >
       {positions.length === 0 ? (
-        <div className="text-hud-text-dim text-sm py-8 text-center">
-          <div className="mb-3">No open positions</div>
-          <button type="button" onClick={onSeedDemoData} className="hud-button text-xs">
-            [ADD DEMO DATA]
-          </button>
-        </div>
+        <div className="text-hud-text-dim text-sm py-8 text-center">No open positions</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">

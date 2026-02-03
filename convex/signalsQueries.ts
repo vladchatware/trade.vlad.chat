@@ -1,16 +1,29 @@
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 
-// Query: Get top signals
 export const getTop = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 20
-    return await ctx.db.query('signals').order('desc').take(limit)
+    return await ctx.db
+      .query('signals')
+      .withIndex('by_timestamp')
+      .order('desc')
+      .take(args.limit ?? 20)
   },
 })
 
-// Query: Get crypto signals
+export const getLatestBySymbol = query({
+  args: { symbol: v.string() },
+  handler: async (ctx, args) => {
+    const recent = await ctx.db
+      .query('signals')
+      .withIndex('by_symbol', (q) => q.eq('symbol', args.symbol))
+      .order('desc')
+      .take(1)
+    return recent[0] ?? null
+  },
+})
+
 export const getCrypto = query({
   args: {
     limit: v.optional(v.number()),
@@ -20,32 +33,25 @@ export const getCrypto = query({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 20
     const symbols = args.symbols ?? []
-    const minMomentum = args.minMomentum ?? 0.02
+    const minMomentum = args.minMomentum ?? 0
 
-    // Filter crypto signals after fetching since we can't query by optional field
-    const allSignals = await ctx.db
+    const candidates = await ctx.db
       .query('signals')
+      .withIndex('by_timestamp')
       .order('desc')
       .take(limit * 3)
 
-    return allSignals
-      .filter((s) => {
-        // Must be crypto signal
-        if (s.isCrypto !== true) return false
-
-        // Filter by symbols if provided
-        if (symbols.length > 0 && !symbols.includes(s.symbol)) return false
-
-        // Filter by momentum if provided
-        if (minMomentum > 0 && (s.momentum || 0) < minMomentum) return false
-
+    return candidates
+      .filter((signal) => {
+        if (signal.isCrypto !== true) return false
+        if (symbols.length > 0 && !symbols.includes(signal.symbol)) return false
+        if ((signal.momentum ?? 0) < minMomentum) return false
         return true
       })
       .slice(0, limit)
   },
 })
 
-// Mutation: Create a signal
 export const create = mutation({
   args: {
     symbol: v.string(),

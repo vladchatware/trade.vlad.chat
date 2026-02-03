@@ -15,7 +15,6 @@ bun install
 
 2. Create env files:
 - `.env.local`
-- `.dev.vars`
 
 3. Start the main stack:
 
@@ -25,10 +24,11 @@ bun run dev
 
 This runs Convex, Next.js, and worker together.
 
-## Worker MCP dependency
+## Worker Runtime Notes
 
-The worker expects `MCP_URL` (default `http://localhost:3000/api/mcp`).
-This endpoint is served by Next.js (`app/api/mcp/route.ts`), so it comes up automatically with `bun run dev`.
+- Worker ingestion is API-direct (Alpaca + StockTwits) and writes to Convex.
+- It requires `CONVEX_URL` (or `NEXT_PUBLIC_CONVEX_URL`) plus Alpaca credentials.
+- Trading decisions/execution are scheduled by Convex crons (`convex/crons.ts`), not by the worker.
 
 ## Helpful Commands
 

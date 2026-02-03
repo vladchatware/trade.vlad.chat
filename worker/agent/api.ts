@@ -2,10 +2,10 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { saveConfig } from './config'
-import type { SimpleOrchestrator } from './orchestrator'
+import type { Orchestrator } from './orchestrator'
 import { getErrorMessage } from './utils'
 
-export function startDashboardAPI(orchestrator: SimpleOrchestrator) {
+export function startDashboardAPI(orchestrator: Orchestrator) {
   const PORT = Number(process.env.AGENT_PORT || 3001)
 
   const server = http.createServer(async (req, res) => {
@@ -111,7 +111,7 @@ export function startDashboardAPI(orchestrator: SimpleOrchestrator) {
             if (ai_gateway_url) envContent += `AI_GATEWAY_URL=${ai_gateway_url}\n`
             envContent += `KILL_SWITCH_SECRET=mahoraga_kill_${Date.now()}\n`
 
-            const envPath = path.join(process.cwd(), '.dev.vars')
+            const envPath = path.join(process.cwd(), '.env.local')
             fs.writeFileSync(envPath, envContent)
 
             if (starting_equity) {

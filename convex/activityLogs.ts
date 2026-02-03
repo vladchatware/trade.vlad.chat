@@ -6,24 +6,26 @@ export const create = mutation({
     agent: v.string(),
     action: v.string(),
     symbol: v.optional(v.string()),
-    details: v.optional(v.record(v.string(), v.any())),
+    detailsJson: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { details, ...rest } = args
     return await ctx.db.insert('activityLogs', {
-      ...rest,
-      detailsJson: details ? JSON.stringify(details) : undefined,
+      agent: args.agent,
+      action: args.action,
+      symbol: args.symbol,
+      detailsJson: args.detailsJson,
       timestamp: Date.now(),
     })
   },
 })
 
-export const getRecent = query({
-  args: {
-    limit: v.number(),
-  },
+export const latest = query({
+  args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    return await ctx.db.query('activityLogs').order('desc').take(args.limit)
+    return await ctx.db
+      .query('activityLogs')
+      .withIndex('by_timestamp')
+      .order('desc')
+      .take(args.limit ?? 50)
   },
 })

@@ -1,27 +1,56 @@
 'use node'
 
 import { v } from 'convex/values'
+import { z } from 'zod'
+import { DEFAULT_LLM_MODEL } from '../shared/llmCatalog'
 import { api } from './_generated/api'
 import { action } from './_generated/server'
 import { calculateCost, completeWithGateway } from './providers/llm'
 
-/**
- * Extracts JSON from a string that may be wrapped in markdown code blocks.
- * Handles cases like:
- *   ```json
- *   { ... }
- *   ```
- * Or plain JSON strings.
- */
-function extractJsonFromMarkdown(content: string): string {
-  // Try to extract JSON from markdown code blocks
+export type ResearchSignalResult = {
+  verdict: 'BUY' | 'SKIP' | 'WAIT'
+  confidence: number
+  reasoning: string
+  redFlags: string[]
+  catalysts: string[]
+}
+
+export const ResearchSignalSchema = z.object({
+  verdict: z.enum(['BUY', 'SKIP', 'WAIT']),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string().default(''),
+  red_flags: z.array(z.string()).default([]),
+  catalysts: z.array(z.string()).default([]),
+})
+
+export function extractJsonFromMarkdown(content: string): string {
   const jsonCodeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
   if (jsonCodeBlockMatch) {
-    return jsonCodeBlockMatch[1].trim()
+    return jsonCodeBlockMatch[1]?.trim() ?? ''
   }
-
-  // No code block found, return the content as-is (trimmed)
   return content.trim()
+}
+
+export function parseResearchSignalResponse(content: string): ResearchSignalResult {
+  try {
+    const jsonContent = extractJsonFromMarkdown(content)
+    const parsed = ResearchSignalSchema.parse(JSON.parse(jsonContent))
+    return {
+      verdict: parsed.verdict,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      redFlags: parsed.red_flags,
+      catalysts: parsed.catalysts,
+    }
+  } catch {
+    return {
+      verdict: 'SKIP',
+      confidence: 0,
+      reasoning: 'Parse error',
+      redFlags: [],
+      catalysts: [],
+    }
+  }
 }
 
 export const researchSignal = action({
@@ -30,7 +59,7 @@ export const researchSignal = action({
     sentiment: v.number(),
     volume: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ResearchSignalResult> => {
     const prompt = `Analyze ${args.symbol} for potential trading opportunity.
 Current sentiment: ${(args.sentiment * 100).toFixed(0)}%
 Social volume: ${args.volume}
@@ -44,9 +73,7 @@ Respond with JSON:
   "catalysts": ["catalyst1", "catalyst2"]
 }`
 
-    // Use Kimi K2.5 for analysis (fast and accurate)
-    const model = 'moonshotai/kimi-k2.5'
-
+    const model = DEFAULT_LLM_MODEL
     const result = await completeWithGateway({
       model,
       messages: [
@@ -60,7 +87,6 @@ Respond with JSON:
       temperature: 0.3,
     })
 
-    // Track cost
     await ctx.runMutation(api.llmCosts.track, {
       model,
       tokensIn: result.usage.prompt_tokens,
@@ -68,25 +94,6 @@ Respond with JSON:
       costUsd: calculateCost(model, result.usage),
     })
 
-    try {
-      // Extract JSON from markdown if present, then parse
-      const jsonContent = extractJsonFromMarkdown(result.content)
-      const parsed = JSON.parse(jsonContent)
-      return {
-        verdict: parsed.verdict,
-        confidence: parsed.confidence,
-        reasoning: parsed.reasoning,
-        redFlags: parsed.red_flags || [],
-        catalysts: parsed.catalysts || [],
-      }
-    } catch {
-      return {
-        verdict: 'SKIP',
-        confidence: 0,
-        reasoning: 'Parse error',
-        redFlags: [],
-        catalysts: [],
-      }
-    }
+    return parseResearchSignalResponse(result.content)
   },
 })

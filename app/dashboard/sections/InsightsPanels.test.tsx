@@ -46,6 +46,13 @@ describe('InsightsPanels', () => {
             detailsJson: JSON.stringify({ orderId: 'abcdef123456' }),
             timestamp: new Date('2026-02-03T13:00:00.000Z').valueOf(),
           },
+          {
+            _id: 'log-2',
+            agent: 'System',
+            action: 'decision_cycle_skipped',
+            detailsJson: JSON.stringify({ reason: 'market_closed' }),
+            timestamp: new Date('2026-02-03T13:01:00.000Z').valueOf(),
+          },
         ]}
       />
     )
@@ -53,6 +60,7 @@ describe('InsightsPanels', () => {
     expect(screen.getByText('Executor')).toBeInTheDocument()
     expect(screen.getByText('Order Submitted · abcdef12')).toBeInTheDocument()
     expect(screen.getByText('(AAPL)')).toBeInTheDocument()
+    expect(screen.getByText('Cycle Skipped · market_closed')).toBeInTheDocument()
   })
 
   it('renders signal research empty and populated states', () => {

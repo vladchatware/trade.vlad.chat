@@ -54,24 +54,13 @@ export interface PolicyResult {
 }
 
 export class PolicyEngine {
-  private config: PolicyConfig
-
-  constructor(config: Partial<PolicyConfig> = {}) {
-    this.config = {
-      maxPositionPctEquity: 0.2,
-      maxNotionalPerTrade: 5000,
-      maxDailyLossPct: 0.02,
-      cooldownMinutes: 30,
-      maxOpenPositions: 10,
-      approvalTtlSeconds: 300,
-      ...config,
-    }
-  }
+  constructor(private readonly config: PolicyConfig) {}
 
   evaluate(ctx: PolicyContext): PolicyResult {
     const violations: PolicyViolation[] = []
     const warnings: PolicyWarning[] = []
 
+    this.checkOrderInputs(ctx, violations)
     this.checkKillSwitch(ctx, violations)
     this.checkCooldown(ctx, violations)
     this.checkDailyLossLimit(ctx, violations)
@@ -88,6 +77,27 @@ export class PolicyEngine {
     }
   }
 
+  private checkOrderInputs(ctx: PolicyContext, violations: PolicyViolation[]): void {
+    const qty = ctx.order.qty ?? 0
+    if (!Number.isFinite(qty) || qty <= 0) {
+      violations.push({
+        rule: 'invalid_qty',
+        message: 'Order quantity must be greater than 0',
+        currentValue: qty,
+        limitValue: '> 0',
+      })
+    }
+
+    if (!Number.isFinite(ctx.order.estimatedPrice) || ctx.order.estimatedPrice <= 0) {
+      violations.push({
+        rule: 'invalid_price',
+        message: 'Estimated price must be greater than 0',
+        currentValue: ctx.order.estimatedPrice,
+        limitValue: '> 0',
+      })
+    }
+  }
+
   private checkKillSwitch(ctx: PolicyContext, violations: PolicyViolation[]): void {
     if (ctx.riskState.killSwitchActive) {
       violations.push({
@@ -101,10 +111,9 @@ export class PolicyEngine {
 
   private checkCooldown(ctx: PolicyContext, violations: PolicyViolation[]): void {
     if (ctx.riskState.cooldownUntil && Date.now() < ctx.riskState.cooldownUntil) {
-      const remaining = Math.ceil((ctx.riskState.cooldownUntil - Date.now()) / 60000)
       violations.push({
         rule: 'cooldown',
-        message: `In cooldown period. ${remaining} minutes remaining.`,
+        message: 'In cooldown period',
         currentValue: 'active',
         limitValue: 'expired',
       })
@@ -112,6 +121,7 @@ export class PolicyEngine {
   }
 
   private checkDailyLossLimit(ctx: PolicyContext, violations: PolicyViolation[]): void {
+    if (ctx.account.equity <= 0) return
     const dailyLossPct = ctx.riskState.dailyLossUsd / ctx.account.equity
     if (dailyLossPct >= this.config.maxDailyLossPct) {
       violations.push({
@@ -135,7 +145,7 @@ export class PolicyEngine {
   }
 
   private checkMaxPositions(ctx: PolicyContext, violations: PolicyViolation[]): void {
-    const heldSymbols = new Set(ctx.positions.map((p) => p.symbol))
+    const heldSymbols = new Set(ctx.positions.map((position) => position.symbol))
     const isNewPosition = !heldSymbols.has(ctx.order.symbol)
 
     if (isNewPosition && ctx.positions.length >= this.config.maxOpenPositions) {
@@ -167,44 +177,52 @@ export class PolicyEngine {
     violations: PolicyViolation[],
     warnings: PolicyWarning[]
   ): void {
-    if (ctx.order.side === 'buy') {
-      const qty = ctx.order.qty ?? 0
-      const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
-      const positionPct = notional / ctx.account.equity
+    if (ctx.order.side !== 'buy' || ctx.account.equity <= 0) return
 
-      if (positionPct > this.config.maxPositionPctEquity) {
-        violations.push({
-          rule: 'position_size',
-          message: `Position size exceeds ${(this.config.maxPositionPctEquity * 100).toFixed(0)}% of equity`,
-          currentValue: positionPct,
-          limitValue: this.config.maxPositionPctEquity,
-        })
-      } else if (positionPct > this.config.maxPositionPctEquity * 0.8) {
-        warnings.push({
-          rule: 'position_size_warning',
-          message: `Position size approaching limit: ${(positionPct * 100).toFixed(1)}%`,
-        })
-      }
+    const qty = ctx.order.qty ?? 0
+    const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
+    const positionPct = notional / ctx.account.equity
+
+    if (positionPct > this.config.maxPositionPctEquity) {
+      violations.push({
+        rule: 'position_size',
+        message: `Position size exceeds ${(this.config.maxPositionPctEquity * 100).toFixed(0)}% of equity`,
+        currentValue: positionPct,
+        limitValue: this.config.maxPositionPctEquity,
+      })
+    } else if (positionPct > this.config.maxPositionPctEquity * 0.8) {
+      warnings.push({
+        rule: 'position_size_warning',
+        message: `Position size approaching limit: ${(positionPct * 100).toFixed(1)}%`,
+      })
     }
   }
 
   private checkBuyingPower(ctx: PolicyContext, violations: PolicyViolation[]): void {
-    if (ctx.order.side === 'buy') {
-      const qty = ctx.order.qty ?? 0
-      const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
+    if (ctx.order.side !== 'buy') return
 
-      if (notional > ctx.account.buyingPower) {
-        violations.push({
-          rule: 'buying_power',
-          message: 'Insufficient buying power',
-          currentValue: notional,
-          limitValue: ctx.account.buyingPower,
-        })
-      }
+    const qty = ctx.order.qty ?? 0
+    const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
+
+    if (notional > ctx.account.buyingPower) {
+      violations.push({
+        rule: 'buying_power',
+        message: 'Insufficient buying power',
+        currentValue: notional,
+        limitValue: ctx.account.buyingPower,
+      })
     }
   }
 }
 
-export function createPolicyEngine(config?: Partial<PolicyConfig>): PolicyEngine {
-  return new PolicyEngine(config)
+export function createPolicyEngine(config: Partial<PolicyConfig> = {}): PolicyEngine {
+  return new PolicyEngine({
+    maxPositionPctEquity: 0.2,
+    maxNotionalPerTrade: 5000,
+    maxDailyLossPct: 0.02,
+    cooldownMinutes: 30,
+    maxOpenPositions: 10,
+    approvalTtlSeconds: 300,
+    ...config,
+  })
 }

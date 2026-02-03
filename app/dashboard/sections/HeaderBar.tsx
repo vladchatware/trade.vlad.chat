@@ -25,7 +25,7 @@ export function HeaderBar({
       <div className="flex items-center gap-4 md:gap-6">
         <div className="flex items-baseline gap-2">
           <span className="text-xl md:text-2xl font-light tracking-tight text-hud-text-bright">
-            MAHORAGA
+            trade.vlad.chat
           </span>
           <span className="hud-label">v2</span>
         </div>

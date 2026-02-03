@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
 import type { Config, PositionRow } from '../types'
 import { AccountPanel, LlmCostsPanel, PositionsPanel } from './RowOnePanels'
@@ -37,21 +37,10 @@ describe('RowOnePanels', () => {
     expect(screen.getByText('$2,500.00 (+2.50%)')).toBeInTheDocument()
   })
 
-  it('renders empty positions state and triggers demo seed action', () => {
-    const onSeedDemoData = vi.fn()
-
-    render(
-      <PositionsPanel
-        positions={[]}
-        config={config}
-        positionPriceHistories={{}}
-        onSeedDemoData={onSeedDemoData}
-      />
-    )
+  it('renders empty positions state', () => {
+    render(<PositionsPanel positions={[]} config={config} positionPriceHistories={{}} />)
 
     expect(screen.getByText('No open positions')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '[ADD DEMO DATA]' }))
-    expect(onSeedDemoData).toHaveBeenCalledTimes(1)
   })
 
   it('renders position table rows with trend data', () => {
@@ -71,7 +60,6 @@ describe('RowOnePanels', () => {
         positions={positions}
         config={config}
         positionPriceHistories={{ 'BTC/USD': [100, 105, 110] }}
-        onSeedDemoData={() => {}}
       />
     )
 
