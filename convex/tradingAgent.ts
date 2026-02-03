@@ -4,7 +4,6 @@
 
 import { api } from './_generated/api'
 import { action } from './_generated/server'
-import { upsertPositionEntry } from './lib/positionEntries'
 import { createAlpacaClient } from './providers/alpaca'
 
 // Main trading loop - ported from agent-v1.mjs
@@ -19,9 +18,19 @@ export const runTrading = action({
       return { status: 'skipped', reason: 'Config missing or kill switch active' }
     }
 
+    type AlpacaPosition = {
+      symbol: string
+      unrealized_plpc?: string | number
+    }
+    type SignalCandidate = {
+      sentiment?: number
+      symbol: string
+      price?: number
+    }
+
     // Fetch current state
     const account = await alpaca.getAccount()
-    const positions = await alpaca.getPositions()
+    const positions = (await alpaca.getPositions()) as AlpacaPosition[]
     const clock = await alpaca.getClock()
 
     if (!clock.is_open) {
@@ -58,15 +67,13 @@ export const runTrading = action({
 
     // Look for buy opportunities
     if (positions.length < config.maxPositions) {
-      const signals = await ctx.runQuery(api.signalsQueries.getTop, {
+      const signals = (await ctx.runQuery(api.signalsQueries.getTop, {
         limit: 5,
-      })
+      })) as SignalCandidate[]
       // Filter by sentiment after fetching
-      const filteredSignals = signals.filter((s) => (s.sentiment || 0) >= config.minSentimentScore)
+      const filteredSignals = signals.filter((s) => (s.sentiment ?? 0) >= config.minSentimentScore)
 
-      // @ts-ignore - parameter 'p' implicitly has 'any' type
       const heldSymbols = new Set(positions.map((p) => p.symbol))
-      // @ts-ignore - parameter 's' implicitly has 'any' type
       const candidates = filteredSignals.filter((s) => !heldSymbols.has(s.symbol))
 
       for (const signal of candidates.slice(0, 1)) {
@@ -98,50 +105,31 @@ export const gatherData = action({
   args: {},
   handler: async (ctx) => {
     const alpaca = createAlpacaClient()
+    type AlpacaPosition = {
+      symbol: string
+      qty?: string | number
+      avg_entry_price?: string | number
+      current_price?: string | number
+      market_value?: string | number
+      unrealized_pl?: string | number
+      unrealized_plpc?: string | number
+    }
 
     // Update positions in database
-    const positions = await alpaca.getPositions()
+    const positions = (await alpaca.getPositions()) as AlpacaPosition[]
 
     for (const pos of positions) {
-      // @ts-ignore - ctx.db property issues
-      const existing = await ctx.db
-        .query('positions')
-        // @ts-ignore - parameter 'q' implicitly has 'any' type
-        .withIndex('by_symbol', (q) => q.eq('symbol', pos.symbol))
-        .first()
-
-      // @ts-ignore - Number.parseFloat argument type issues
       const positionData = {
         symbol: pos.symbol,
-        // @ts-ignore
-        qty: Number.parseFloat(pos.qty),
-        // @ts-ignore - Property 'avg_entry_price' does not exist on type 'AlpacaPosition'
-        avgEntryPrice: Number.parseFloat(pos.avg_entry_price),
-        // @ts-ignore
-        currentPrice: Number.parseFloat(pos.current_price),
-        // @ts-ignore
-        marketValue: Number.parseFloat(pos.market_value),
-        // @ts-ignore
-        unrealizedPl: Number.parseFloat(pos.unrealized_pl),
-        // @ts-ignore
-        unrealizedPlpc: Number.parseFloat(pos.unrealized_plpc),
-        updatedAt: Date.now(),
+        qty: Number.parseFloat(String(pos.qty ?? 0)),
+        avgEntryPrice: Number.parseFloat(String(pos.avg_entry_price ?? 0)),
+        currentPrice: Number.parseFloat(String(pos.current_price ?? 0)),
+        marketValue: Number.parseFloat(String(pos.market_value ?? 0)),
+        unrealizedPl: Number.parseFloat(String(pos.unrealized_pl ?? 0)),
+        unrealizedPlpc: Number.parseFloat(String(pos.unrealized_plpc ?? 0)),
       }
 
-      if (existing) {
-        // @ts-ignore - ctx.db property issues
-        await ctx.db.patch(existing._id, positionData)
-      } else {
-        // @ts-ignore - ctx.db property issues
-        await ctx.db.insert('positions', positionData)
-      }
-
-      await upsertPositionEntry(ctx, {
-        symbol: positionData.symbol,
-        qty: positionData.qty,
-        avgEntryPrice: positionData.avgEntryPrice,
-        currentPrice: positionData.currentPrice,
-      })
+      await ctx.runMutation(api.positions.updateFromWebSocket, positionData)
 
       await ctx.runMutation(api.positionHistory.upsert, {
         symbol: positionData.symbol,
@@ -151,23 +139,8 @@ export const gatherData = action({
     }
 
     // Remove stale entries for closed positions
-    const activeSymbols = new Set(positions.map((pos) => pos.symbol))
-    // @ts-ignore - ctx.db property issues
-    const entries = await ctx.db.query('positionEntries').collect()
-    for (const entry of entries) {
-      if (!activeSymbols.has(entry.symbol)) {
-        // @ts-ignore - ctx.db property issues
-        await ctx.db.delete(entry._id)
-      }
-    }
-    // @ts-ignore - ctx.db property issues
-    const stalenessItems = await ctx.db.query('stalenessAnalysis').collect()
-    for (const item of stalenessItems) {
-      if (!activeSymbols.has(item.symbol)) {
-        // @ts-ignore - ctx.db property issues
-        await ctx.db.delete(item._id)
-      }
-    }
+    const activeSymbols = positions.map((pos) => pos.symbol)
+    await ctx.runMutation(api.positions.cleanupClosed, { activeSymbols })
 
     // Fetch and store account data for real-time dashboard updates
     const account = await alpaca.getAccount()
