@@ -34,7 +34,9 @@ describe('secEdgar actions', () => {
   })
 
   it('fetches latest filings for a symbol', async () => {
-    const mockFetch = vi.fn((url: string) => {
+    const mockFetch = vi.fn((input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('company_tickers.json')) {
         return Promise.resolve({
           ok: true,
@@ -59,7 +61,7 @@ describe('secEdgar actions', () => {
           },
         }),
       })
-    })
+    }) as unknown as typeof fetch
     vi.stubGlobal('fetch', mockFetch)
 
     const items = await getLatestFilings('AAPL', 5, mockFetch)

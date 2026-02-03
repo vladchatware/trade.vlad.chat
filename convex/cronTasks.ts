@@ -4,7 +4,7 @@ import { api } from './_generated/api'
 import { action } from './_generated/server'
 import { createAlpacaClient } from './providers/alpaca'
 
-export const ingestSecEdgar = action({
+export const ingestSecEdgar: ReturnType<typeof action> = action({
   args: {},
   handler: async (ctx) => {
     const alpaca = createAlpacaClient()
@@ -37,7 +37,7 @@ export const ingestSecEdgar = action({
   },
 })
 
-export const marketOpenPrep = action({
+export const marketOpenPrep: ReturnType<typeof action> = action({
   args: {},
   handler: async (ctx) => {
     const riskState = await ctx.runQuery(api.riskState.get)
@@ -52,7 +52,7 @@ export const marketOpenPrep = action({
   },
 })
 
-export const marketCloseCleanup = action({
+export const marketCloseCleanup: ReturnType<typeof action> = action({
   args: {},
   handler: async (ctx) => {
     const alpaca = createAlpacaClient()
@@ -71,7 +71,7 @@ export const marketCloseCleanup = action({
   },
 })
 
-export const midnightReset = action({
+export const midnightReset: ReturnType<typeof action> = action({
   args: {},
   handler: async (ctx) => {
     const [reset, approvals] = await Promise.all([
@@ -87,7 +87,7 @@ export const midnightReset = action({
   },
 })
 
-export const hourlyCacheRefresh = action({
+export const hourlyCacheRefresh: ReturnType<typeof action> = action({
   args: {},
   handler: async () => {
     return { status: 'noop' }

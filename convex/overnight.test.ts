@@ -4,7 +4,12 @@ import { buildOvernightActivity, buildPremarketPlan } from './overnight'
 describe('overnight helpers', () => {
   it('buildOvernightActivity aggregates counts and readiness', () => {
     const signals = [{ sentiment: 0.2 }, { sentiment: 0.1 }]
-    const research = [
+    const research: Array<{
+      verdict: 'BUY' | 'SKIP' | 'WAIT'
+      confidence: number
+      reasoning: string
+      symbol: string
+    }> = [
       { verdict: 'BUY', confidence: 0.8, reasoning: 'x', symbol: 'AAPL' },
       { verdict: 'SKIP', confidence: 0.6, reasoning: 'y', symbol: 'MSFT' },
     ]
@@ -23,7 +28,12 @@ describe('overnight helpers', () => {
 
   it('buildPremarketPlan creates bullish outlook and recommendations', () => {
     const signals = [{ sentiment: 0.4 }, { sentiment: 0.3 }]
-    const research = [
+    const research: Array<{
+      verdict: 'BUY' | 'SKIP' | 'WAIT'
+      confidence: number
+      reasoning: string
+      symbol: string
+    }> = [
       { verdict: 'BUY', confidence: 0.9, reasoning: 'Strong', symbol: 'AAPL' },
       { verdict: 'BUY', confidence: 0.75, reasoning: 'Setup', symbol: 'MSFT' },
       { verdict: 'SKIP', confidence: 0.8, reasoning: 'Nope', symbol: 'TSLA' },
