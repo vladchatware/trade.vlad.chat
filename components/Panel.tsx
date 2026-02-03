@@ -1,20 +1,29 @@
+import clsx from 'clsx'
 import type { ReactNode } from 'react'
 
 interface PanelProps {
-  title: string
-  titleRight?: ReactNode
   children: ReactNode
+  title?: string
+  titleRight?: string | ReactNode
   className?: string
+  noPadding?: boolean
 }
 
-export function Panel({ title, titleRight, children, className = '' }: PanelProps) {
+export function Panel({ children, title, titleRight, className, noPadding = false }: PanelProps) {
   return (
-    <div className={`panel ${className}`}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-sm font-semibold tracking-wider text-gray-400 uppercase">{title}</h2>
-        {titleRight && <div className="text-sm">{titleRight}</div>}
-      </div>
-      {children}
+    <div className={clsx('hud-panel flex flex-col', className)}>
+      {(title || titleRight) && (
+        <div className="flex justify-between items-center px-4 py-2 border-b border-hud-line shrink-0">
+          {title && <span className="hud-label">{title}</span>}
+          {titleRight &&
+            (typeof titleRight === 'string' ? (
+              <span className="hud-value-sm">{titleRight}</span>
+            ) : (
+              titleRight
+            ))}
+        </div>
+      )}
+      <div className={clsx('flex-1 min-h-0', noPadding ? '' : 'p-3')}>{children}</div>
     </div>
   )
 }

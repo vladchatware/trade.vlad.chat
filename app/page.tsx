@@ -183,9 +183,42 @@ export default function Dashboard() {
 
   // Extract data (must be before early return to maintain hook order)
   // Use Convex database only (server-side cron job handles Alpaca fetching)
-  const positions = dbStatus?.positions || []
-  const signals = dbStatus?.signals || []
-  const logs = dbStatus?.logs || []
+  type PositionRow = {
+    symbol: string
+    currentPrice?: number
+    avgEntryPrice?: number
+    unrealizedPl?: number
+    marketValue?: number
+    qty?: number
+    _id?: string
+  }
+  type SignalRow = {
+    _id?: string
+    symbol: string
+    source?: string
+    sentiment?: number
+    volume?: number
+    reason?: string
+    bullish?: number
+    bearish?: number
+    score?: number
+    upvotes?: number
+    isCrypto?: boolean
+    momentum?: number
+    price?: number
+  }
+  type LogRow = {
+    _id?: string
+    agent?: string
+    action?: string
+    symbol?: string
+    detailsJson?: string
+    timestamp?: number
+  }
+  const positions: PositionRow[] = dbStatus?.positions || []
+  const signals: SignalRow[] = dbStatus?.signals || []
+  const logs: LogRow[] = dbStatus?.logs || []
+  const signalResearch = (dbStatus?.signalResearch ?? {}) as Record<string, SignalResearch>
   const config: Config = dbStatus?.config || {
     maxPositionValue: 2000,
     maxPositions: 3,
@@ -204,7 +237,7 @@ export default function Dashboard() {
   const cash = portfolio.cash ?? 0
   const buyingPower = portfolio.buyingPower ?? 0
   const startingEquity = config?.startingEquity || 100000
-  const unrealizedPl = positions.reduce((sum, p) => sum + (p.unrealizedPl || 0), 0)
+  const unrealizedPl = positions.reduce((sum: number, p) => sum + (p.unrealizedPl || 0), 0)
   const totalPl = portfolioValue - startingEquity
   const realizedPl = totalPl - unrealizedPl
   const totalPlPct = portfolioValue ? (totalPl / startingEquity) * 100 : 0
@@ -442,7 +475,9 @@ export default function Dashboard() {
                                       },
                                       {
                                         label: 'Current Price',
-                                        value: formatCurrency(pos.currentPrice),
+                                        value: formatCurrency(
+                                          pos.currentPrice ?? pos.avgEntryPrice ?? 0
+                                        ),
                                       },
                                       {
                                         label: 'Hold Time',
@@ -756,11 +791,13 @@ export default function Dashboard() {
                           hour12: false,
                         })}
                       </span>
-                      <span className={`shrink-0 w-[72px] text-right ${getAgentColor(log.agent)}`}>
-                        {log.agent}
+                      <span
+                        className={`shrink-0 w-[72px] text-right ${getAgentColor(log.agent ?? 'unknown')}`}
+                      >
+                        {log.agent ?? 'unknown'}
                       </span>
                       <span className="text-hud-text flex-1 text-right wrap-break-word">
-                        {formatAction(log.action, log.detailsJson)}
+                        {formatAction(log.action ?? 'unknown', log.detailsJson)}
                         {log.symbol && (
                           <span className="text-hud-primary ml-1">({log.symbol})</span>
                         )}
@@ -776,112 +813,108 @@ export default function Dashboard() {
           <div className="col-span-4 md:col-span-8 lg:col-span-4">
             <Panel
               title="SIGNAL RESEARCH"
-              titleRight={Object.keys(dbStatus?.signalResearch || {}).length.toString()}
+              titleRight={Object.keys(signalResearch).length.toString()}
               className="h-80"
             >
               <div className="overflow-y-auto h-full space-y-2">
-                {Object.entries(dbStatus?.signalResearch || {}).length === 0 ? (
+                {Object.entries(signalResearch).length === 0 ? (
                   <div className="text-hud-text-dim text-sm py-4 text-center">
                     Researching candidates...
                   </div>
                 ) : (
-                  Object.entries(dbStatus?.signalResearch || {}).map(
-                    ([symbol, research]: [string, SignalResearch]) => (
-                      <Tooltip
-                        key={symbol}
-                        position="left"
-                        content={
-                          <div className="space-y-2 min-w-[200px]">
-                            <div className="hud-label text-hud-primary border-b border-hud-line/50 pb-1">
-                              {symbol} DETAILS
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between">
-                                <span className="text-hud-text-dim">Confidence</span>
-                                <span className="text-hud-text-bright">
-                                  {((research.confidence || 0) * 100).toFixed(0)}%
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-hud-text-dim">Sentiment</span>
-                                <span className={getSentimentColor(research.sentiment || 0)}>
-                                  {((research.sentiment || 0) * 100).toFixed(0)}%
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-hud-text-dim">Quality</span>
-                                <span
-                                  className={`hud-label ${getQualityColor(research.entryQuality)}`}
-                                >
-                                  {(research.entryQuality || 'fair').toUpperCase()}
-                                </span>
-                              </div>
-                            </div>
-                            {research.catalysts && research.catalysts.length > 0 && (
-                              <div>
-                                <div className="hud-label text-hud-text-dim mb-1">CATALYSTS</div>
-                                <div className="space-y-1">
-                                  {research.catalysts.slice(0, 2).map((catalyst) => (
-                                    <div key={`${symbol}-catalyst-${catalyst}`} className="text-xs">
-                                      - {catalyst.slice(0, 40)}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {research.redFlags && research.redFlags.length > 0 && (
-                              <div>
-                                <div className="hud-label text-hud-error mb-1">RED FLAGS</div>
-                                <div className="space-y-1">
-                                  {research.redFlags.slice(0, 2).map((flag) => (
-                                    <div
-                                      key={`${symbol}-flag-${flag}`}
-                                      className="text-xs text-hud-error"
-                                    >
-                                      - {flag.slice(0, 40)}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                  Object.entries(signalResearch).map(([symbol, research]) => (
+                    <Tooltip
+                      key={symbol}
+                      position="left"
+                      content={
+                        <div className="space-y-2 min-w-[200px]">
+                          <div className="hud-label text-hud-primary border-b border-hud-line/50 pb-1">
+                            {symbol} DETAILS
                           </div>
-                        }
-                      >
-                        <div className="p-2 border border-hud-line/30 rounded hover:border-hud-line/60 cursor-help transition-colors">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="hud-value-sm">{symbol}</span>
-                            <div className="flex items-center gap-2">
+                          <div className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-hud-text-dim">Confidence</span>
+                              <span className="text-hud-text-bright">
+                                {((research.confidence || 0) * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-hud-text-dim">Sentiment</span>
+                              <span className={getSentimentColor(research.sentiment || 0)}>
+                                {((research.sentiment || 0) * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-hud-text-dim">Quality</span>
                               <span
                                 className={`hud-label ${getQualityColor(research.entryQuality)}`}
                               >
                                 {(research.entryQuality || 'fair').toUpperCase()}
                               </span>
-                              <span
-                                className={`hud-value-sm font-bold ${getVerdictColor(research.verdict)}`}
-                              >
-                                {research.verdict || 'HOLD'}
-                              </span>
                             </div>
                           </div>
-                          <p className="text-xs text-hud-text-dim leading-tight mb-1">
-                            {research.reasoning || 'Analyzing market conditions...'}
-                          </p>
+                          {research.catalysts && research.catalysts.length > 0 && (
+                            <div>
+                              <div className="hud-label text-hud-text-dim mb-1">CATALYSTS</div>
+                              <div className="space-y-1">
+                                {research.catalysts.slice(0, 2).map((catalyst) => (
+                                  <div key={`${symbol}-catalyst-${catalyst}`} className="text-xs">
+                                    - {catalyst.slice(0, 40)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {research.redFlags && research.redFlags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {research.redFlags.slice(0, 2).map((flag: string) => (
-                                <span
-                                  key={`flag-${symbol}-${flag.slice(0, 20)}`}
-                                  className="text-xs text-hud-error bg-hud-error/10 px-1 rounded"
-                                >
-                                  {flag.slice(0, 30)}...
-                                </span>
-                              ))}
+                            <div>
+                              <div className="hud-label text-hud-error mb-1">RED FLAGS</div>
+                              <div className="space-y-1">
+                                {research.redFlags.slice(0, 2).map((flag) => (
+                                  <div
+                                    key={`${symbol}-flag-${flag}`}
+                                    className="text-xs text-hud-error"
+                                  >
+                                    - {flag.slice(0, 40)}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
-                      </Tooltip>
-                    )
-                  )
+                      }
+                    >
+                      <div className="p-2 border border-hud-line/30 rounded hover:border-hud-line/60 cursor-help transition-colors">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="hud-value-sm">{symbol}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`hud-label ${getQualityColor(research.entryQuality)}`}>
+                              {(research.entryQuality || 'fair').toUpperCase()}
+                            </span>
+                            <span
+                              className={`hud-value-sm font-bold ${getVerdictColor(research.verdict)}`}
+                            >
+                              {research.verdict || 'HOLD'}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-hud-text-dim leading-tight mb-1">
+                          {research.reasoning || 'Analyzing market conditions...'}
+                        </p>
+                        {research.redFlags && research.redFlags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {research.redFlags.slice(0, 2).map((flag: string) => (
+                              <span
+                                key={`flag-${symbol}-${flag.slice(0, 20)}`}
+                                className="text-xs text-hud-error bg-hud-error/10 px-1 rounded"
+                              >
+                                {flag.slice(0, 30)}...
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </Tooltip>
+                  ))
                 )}
               </div>
             </Panel>

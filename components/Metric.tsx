@@ -1,23 +1,55 @@
+import clsx from 'clsx'
+
 interface MetricProps {
   label: string
   value: string | number
-  trend?: 'up' | 'down' | 'neutral'
-  prefix?: string
-  suffix?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  color?: 'default' | 'success' | 'warning' | 'error'
+  className?: string
 }
 
-export function Metric({ label, value, trend, prefix = '', suffix = '' }: MetricProps) {
-  const trendColor =
-    trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-400'
+const sizeClasses = {
+  sm: 'hud-value-sm',
+  md: 'hud-value-md',
+  lg: 'hud-value-lg',
+  xl: 'hud-value-xl',
+}
 
+const colorClasses = {
+  default: '',
+  success: 'text-hud-success',
+  warning: 'text-hud-warning',
+  error: 'text-hud-error',
+}
+
+export function Metric({ label, value, size = 'lg', color = 'default', className }: MetricProps) {
   return (
-    <div className="metric-card">
-      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</div>
-      <div className={`text-2xl font-bold ${trendColor}`}>
-        {prefix}
-        {value}
-        {suffix}
-      </div>
+    <div className={clsx('flex flex-col', className)}>
+      <span className="hud-label mb-1">{label}</span>
+      <span className={clsx(sizeClasses[size], colorClasses[color])}>{value}</span>
+    </div>
+  )
+}
+
+interface MetricInlineProps {
+  label: string
+  value: string | number
+  color?: 'default' | 'success' | 'warning' | 'error'
+  valueClassName?: string
+  className?: string
+}
+
+export function MetricInline({
+  label,
+  value,
+  color = 'default',
+  valueClassName,
+  className,
+}: MetricInlineProps) {
+  return (
+    <div className={clsx('flex items-baseline gap-2', className)}>
+      <span className="hud-label">{label}</span>
+      <span className={clsx('hud-value-sm', valueClassName || colorClasses[color])}>{value}</span>
     </div>
   )
 }
