@@ -48,6 +48,8 @@
       "node_modules",
       "dist",
       ".next",
+      ".turbo",
+      ".opencode",
       "_generated",
       "*.d.ts",
       "*.config.js",

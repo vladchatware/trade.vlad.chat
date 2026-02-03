@@ -45,6 +45,7 @@ export const getPositions = action({
     const alpaca = createAlpacaClient()
     const positions = await alpaca.getPositions()
     // @ts-ignore - parameter needs type
+    // biome-ignore lint/suspicious/noExplicitAny: Alpaca SDK returns untyped payloads here.
     return positions.map((p: any) => ({
       symbol: p.symbol,
       qty: p.qty,

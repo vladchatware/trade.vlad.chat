@@ -18,3 +18,25 @@ export const create = mutation({
     return await ctx.db.insert('riskState', args)
   },
 })
+
+export const resetDailyLoss = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db.query('riskState').first()
+    const nextState = {
+      killSwitchActive: existing?.killSwitchActive ?? false,
+      killSwitchReason: existing?.killSwitchReason,
+      dailyLossUsd: 0,
+      dailyLossResetAt: Date.now(),
+      cooldownUntil: existing?.cooldownUntil,
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, nextState)
+      return { reset: true, created: false }
+    }
+
+    await ctx.db.insert('riskState', nextState)
+    return { reset: true, created: true }
+  },
+})

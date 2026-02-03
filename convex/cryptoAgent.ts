@@ -9,8 +9,10 @@ import { createAlpacaClient } from './providers/alpaca'
 // 24/7 crypto trading loop
 export const runCryptoTrading = action({
   args: {},
+  // biome-ignore lint/suspicious/noExplicitAny: Convex ctx typing is omitted here.
   handler: async (ctx: any) => {
     // @ts-ignore - config typing
+    // biome-ignore lint/suspicious/noExplicitAny: Config typing is handled dynamically.
     const config: any = await ctx.runQuery(api.config.get)
 
     if (!config?.cryptoEnabled) {
@@ -42,7 +44,7 @@ export const runCryptoTrading = action({
     }
 
     // Look for new crypto opportunities
-    const cryptoSignals = await ctx.runQuery(api.signals.getCrypto, {
+    const cryptoSignals = await ctx.runQuery(api.signalsQueries.getCrypto, {
       symbols: config.cryptoSymbols || [],
       minMomentum: config.cryptoMomentumThreshold || 0.02,
     })
@@ -53,11 +55,7 @@ export const runCryptoTrading = action({
     const candidates = cryptoSignals.filter((s) => !heldSymbols.has(s.symbol))
 
     for (const signal of candidates.slice(0, 1)) {
-      // @ts-ignore - Number.parseFloat argument type issues
-      const positionSize = Math.min(
-        config.maxPositionValue || 1000,
-        Number.parseFloat(account.cash) * 0.1
-      )
+      const positionSize = Math.min(config.maxPositionValue || 1000, account.cash * 0.1)
 
       const preview = await ctx.runAction(api.tradingActions.previewOrder, {
         symbol: signal.symbol,

@@ -1,179 +1,653 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Panel } from './Panel'
 
 interface Config {
   maxPositionValue: number
   maxPositions: number
   minSentimentScore: number
   minAnalystConfidence: number
+  sellSentimentThreshold?: number
   takeProfitPct: number
   stopLossPct: number
   positionSizePctOfCash: number
+  dataPollIntervalMs?: number
+  analystIntervalMs?: number
   llmModel: string
+  llmAnalystModel?: string
+  llmMaxTokens?: number
+  startingEquity?: number
+  optionsEnabled?: boolean
+  optionsMinConfidence?: number
+  optionsMaxPctPerTrade?: number
+  optionsMinDte?: number
+  optionsMaxDte?: number
+  optionsTargetDelta?: number
+  optionsMaxPositions?: number
+  optionsStopLossPct?: number
+  optionsTakeProfitPct?: number
+  cryptoEnabled?: boolean
+  cryptoSymbols?: string[]
+  cryptoMomentumThreshold?: number
+  cryptoMaxPositionValue?: number
+  cryptoTakeProfitPct?: number
+  cryptoStopLossPct?: number
+  stalePositionEnabled?: boolean
+  staleMaxHoldDays?: number
+  staleMinGainPct?: number
+  staleSocialVolumeDecay?: number
+  staleNoMentionsHours?: number
 }
 
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
   config: Config
-  onSave: (config: Config) => void
+  onSave: (config: Config) => void | Promise<void>
 }
 
+const normalizeConfig = (input: Config): Config => ({
+  ...input,
+  sellSentimentThreshold: input.sellSentimentThreshold ?? 0,
+  dataPollIntervalMs: input.dataPollIntervalMs ?? 5000,
+  analystIntervalMs: input.analystIntervalMs ?? 300000,
+  llmAnalystModel: input.llmAnalystModel ?? 'openai/gpt-5.2-codex',
+  llmMaxTokens: input.llmMaxTokens ?? 4096,
+  startingEquity: input.startingEquity ?? 100000,
+  optionsEnabled: input.optionsEnabled ?? false,
+  optionsMinConfidence: input.optionsMinConfidence ?? 0.75,
+  optionsMaxPctPerTrade: input.optionsMaxPctPerTrade ?? 2,
+  optionsMinDte: input.optionsMinDte ?? 7,
+  optionsMaxDte: input.optionsMaxDte ?? 45,
+  optionsTargetDelta: input.optionsTargetDelta ?? 0.35,
+  optionsMaxPositions: input.optionsMaxPositions ?? 3,
+  optionsStopLossPct: input.optionsStopLossPct ?? 50,
+  optionsTakeProfitPct: input.optionsTakeProfitPct ?? 100,
+  cryptoEnabled: input.cryptoEnabled ?? false,
+  cryptoSymbols: input.cryptoSymbols ?? ['BTC/USD', 'ETH/USD', 'SOL/USD'],
+  cryptoMomentumThreshold: input.cryptoMomentumThreshold ?? 2.0,
+  cryptoMaxPositionValue: input.cryptoMaxPositionValue ?? 1000,
+  cryptoTakeProfitPct: input.cryptoTakeProfitPct ?? 10,
+  cryptoStopLossPct: input.cryptoStopLossPct ?? 5,
+  stalePositionEnabled: input.stalePositionEnabled ?? true,
+  staleMaxHoldDays: input.staleMaxHoldDays ?? 3,
+  staleMinGainPct: input.staleMinGainPct ?? 5,
+  staleSocialVolumeDecay: input.staleSocialVolumeDecay ?? 0.3,
+  staleNoMentionsHours: input.staleNoMentionsHours ?? 8,
+})
+
 export function SettingsModal({ isOpen, onClose, config, onSave }: SettingsModalProps) {
-  const [formData, setFormData] = useState(config)
+  const [formData, setFormData] = useState<Config>(() => normalizeConfig(config))
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setFormData(normalizeConfig(config))
+  }, [config])
+
+  const handleChange = (key: keyof Config, value: Config[keyof Config]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(formData)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="panel w-full max-w-md max-h-[80vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Trading Settings</h2>
-
-        <div className="space-y-4">
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Allow keyboard dismissal of the modal overlay.
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          onClose()
+        }
+      }}
+    >
+      <Panel
+        title="TRADING CONFIGURATION"
+        className="w-full max-w-2xl max-h-[90vh] overflow-auto"
+        titleRight={
+          <button type="button" onClick={onClose} className="hud-label hover:text-hud-primary">
+            [ESC]
+          </button>
+        }
+      >
+        <div
+          role="presentation"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="space-y-6"
+        >
           <div>
-            <label htmlFor="maxPositionValue" className="block text-sm text-gray-400 mb-1">
-              Max Position Value ($)
-            </label>
-            <input
-              id="maxPositionValue"
-              type="number"
-              value={formData.maxPositionValue}
-              onChange={(e) =>
-                setFormData({ ...formData, maxPositionValue: Number(e.target.value) })
-              }
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">Position Limits</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-max-position-value" className="hud-label block mb-1">
+                  Max Position Value ($)
+                </label>
+                <input
+                  id="settings-max-position-value"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.maxPositionValue}
+                  onChange={(e) => handleChange('maxPositionValue', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-max-positions" className="hud-label block mb-1">
+                  Max Positions
+                </label>
+                <input
+                  id="settings-max-positions"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.maxPositions}
+                  onChange={(e) => handleChange('maxPositions', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-position-size" className="hud-label block mb-1">
+                  Position Size (% of Cash)
+                </label>
+                <input
+                  id="settings-position-size"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.positionSizePctOfCash}
+                  onChange={(e) => handleChange('positionSizePctOfCash', Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="maxPositions" className="block text-sm text-gray-400 mb-1">
-              Max Positions
-            </label>
-            <input
-              id="maxPositions"
-              type="number"
-              value={formData.maxPositions}
-              onChange={(e) => setFormData({ ...formData, maxPositions: Number(e.target.value) })}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">Sentiment Thresholds</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-min-sentiment" className="hud-label block mb-1">
+                  Min Sentiment to Buy (0-1)
+                </label>
+                <input
+                  id="settings-min-sentiment"
+                  type="number"
+                  step="0.05"
+                  className="hud-input w-full"
+                  value={formData.minSentimentScore}
+                  onChange={(e) => handleChange('minSentimentScore', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-min-analyst-confidence" className="hud-label block mb-1">
+                  Min Analyst Confidence (0-1)
+                </label>
+                <input
+                  id="settings-min-analyst-confidence"
+                  type="number"
+                  step="0.05"
+                  className="hud-input w-full"
+                  value={formData.minAnalystConfidence}
+                  onChange={(e) => handleChange('minAnalystConfidence', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-sell-sentiment" className="hud-label block mb-1">
+                  Sell Sentiment Threshold
+                </label>
+                <input
+                  id="settings-sell-sentiment"
+                  type="number"
+                  step="0.05"
+                  className="hud-input w-full"
+                  value={formData.sellSentimentThreshold}
+                  onChange={(e) => handleChange('sellSentimentThreshold', Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="minSentimentScore" className="block text-sm text-gray-400 mb-1">
-              Min Sentiment Score (0-1)
-            </label>
-            <input
-              id="minSentimentScore"
-              type="number"
-              step="0.1"
-              min="0"
-              max="1"
-              value={formData.minSentimentScore}
-              onChange={(e) =>
-                setFormData({ ...formData, minSentimentScore: Number(e.target.value) })
-              }
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">Risk Management</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-take-profit" className="hud-label block mb-1">
+                  Take Profit (%)
+                </label>
+                <input
+                  id="settings-take-profit"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.takeProfitPct}
+                  onChange={(e) => handleChange('takeProfitPct', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-stop-loss" className="hud-label block mb-1">
+                  Stop Loss (%)
+                </label>
+                <input
+                  id="settings-stop-loss"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.stopLossPct}
+                  onChange={(e) => handleChange('stopLossPct', Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="minAnalystConfidence" className="block text-sm text-gray-400 mb-1">
-              Min Analyst Confidence (0-1)
-            </label>
-            <input
-              id="minAnalystConfidence"
-              type="number"
-              step="0.1"
-              min="0"
-              max="1"
-              value={formData.minAnalystConfidence}
-              onChange={(e) =>
-                setFormData({ ...formData, minAnalystConfidence: Number(e.target.value) })
-              }
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">Polling Intervals</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-data-poll" className="hud-label block mb-1">
+                  Data Poll (ms)
+                </label>
+                <input
+                  id="settings-data-poll"
+                  type="number"
+                  step="1000"
+                  className="hud-input w-full"
+                  value={formData.dataPollIntervalMs}
+                  onChange={(e) => handleChange('dataPollIntervalMs', Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-analyst-interval" className="hud-label block mb-1">
+                  Analyst Interval (ms)
+                </label>
+                <input
+                  id="settings-analyst-interval"
+                  type="number"
+                  step="1000"
+                  className="hud-input w-full"
+                  value={formData.analystIntervalMs}
+                  onChange={(e) => handleChange('analystIntervalMs', Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="takeProfitPct" className="block text-sm text-gray-400 mb-1">
-              Take Profit (%)
-            </label>
-            <input
-              id="takeProfitPct"
-              type="number"
-              value={formData.takeProfitPct}
-              onChange={(e) => setFormData({ ...formData, takeProfitPct: Number(e.target.value) })}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">LLM Configuration</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-llm-model" className="hud-label block mb-1">
+                  Research Model (cheap)
+                </label>
+                <select
+                  id="settings-llm-model"
+                  className="hud-input w-full"
+                  value={formData.llmModel}
+                  onChange={(e) => handleChange('llmModel', e.target.value)}
+                >
+                  <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
+                  <option value="openai/gpt-5.2-codex">GPT 5.2 Codex</option>
+                  <option value="xai/grok-4.1-fast-reasoning">Grok 4.1</option>
+                  <option value="deepseek/deepseek-v3.2-thinking">DeepSeek 3.2</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="settings-llm-analyst-model" className="hud-label block mb-1">
+                  Analyst Model (smart)
+                </label>
+                <select
+                  id="settings-llm-analyst-model"
+                  className="hud-input w-full"
+                  value={formData.llmAnalystModel}
+                  onChange={(e) => handleChange('llmAnalystModel', e.target.value)}
+                >
+                  <option value="openai/gpt-5.2-codex">GPT 5.2 Codex</option>
+                  <option value="openai/gpt-4o">GPT-4o</option>
+                  <option value="openai/gpt-4o-mini">GPT-4o mini</option>
+                  <option value="moonshotai/kimi-k2.5">Kimi K2.5</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="settings-llm-max-tokens" className="hud-label block mb-1">
+                  Max Tokens
+                </label>
+                <input
+                  id="settings-llm-max-tokens"
+                  type="number"
+                  step="128"
+                  className="hud-input w-full"
+                  value={formData.llmMaxTokens}
+                  onChange={(e) => handleChange('llmMaxTokens', Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="stopLossPct" className="block text-sm text-gray-400 mb-1">
-              Stop Loss (%)
-            </label>
-            <input
-              id="stopLossPct"
-              type="number"
-              value={formData.stopLossPct}
-              onChange={(e) => setFormData({ ...formData, stopLossPct: Number(e.target.value) })}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-primary">Account</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="settings-starting-equity" className="hud-label block mb-1">
+                  Starting Equity ($)
+                </label>
+                <input
+                  id="settings-starting-equity"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.startingEquity}
+                  onChange={(e) => handleChange('startingEquity', Number(e.target.value))}
+                />
+                <p className="text-xs text-hud-text-dim mt-1">For P&L calculation</p>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="positionSizePctOfCash" className="block text-sm text-gray-400 mb-1">
-              Position Size % of Cash
-            </label>
-            <input
-              id="positionSizePctOfCash"
-              type="number"
-              step="5"
-              min="5"
-              max="100"
-              value={formData.positionSizePctOfCash}
-              onChange={(e) =>
-                setFormData({ ...formData, positionSizePctOfCash: Number(e.target.value) })
-              }
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            />
+            <h3 className="hud-label mb-3 text-hud-purple">Options Trading (Beta)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="hud-input w-4 h-4"
+                    checked={formData.optionsEnabled}
+                    onChange={(e) => handleChange('optionsEnabled', e.target.checked)}
+                  />
+                  <span className="hud-label">Enable Options Trading</span>
+                </label>
+              </div>
+              <div>
+                <label htmlFor="settings-options-min-confidence" className="hud-label block mb-1">
+                  Min Confidence (0-1)
+                </label>
+                <input
+                  id="settings-options-min-confidence"
+                  type="number"
+                  step="0.05"
+                  className="hud-input w-full"
+                  value={formData.optionsMinConfidence}
+                  onChange={(e) => handleChange('optionsMinConfidence', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-max-pct" className="hud-label block mb-1">
+                  Max % Per Trade
+                </label>
+                <input
+                  id="settings-options-max-pct"
+                  type="number"
+                  step="0.5"
+                  className="hud-input w-full"
+                  value={formData.optionsMaxPctPerTrade}
+                  onChange={(e) => handleChange('optionsMaxPctPerTrade', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-min-dte" className="hud-label block mb-1">
+                  Min DTE (days)
+                </label>
+                <input
+                  id="settings-options-min-dte"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.optionsMinDte}
+                  onChange={(e) => handleChange('optionsMinDte', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-max-dte" className="hud-label block mb-1">
+                  Max DTE (days)
+                </label>
+                <input
+                  id="settings-options-max-dte"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.optionsMaxDte}
+                  onChange={(e) => handleChange('optionsMaxDte', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-target-delta" className="hud-label block mb-1">
+                  Target Delta
+                </label>
+                <input
+                  id="settings-options-target-delta"
+                  type="number"
+                  step="0.05"
+                  className="hud-input w-full"
+                  value={formData.optionsTargetDelta}
+                  onChange={(e) => handleChange('optionsTargetDelta', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-max-positions" className="hud-label block mb-1">
+                  Max Positions
+                </label>
+                <input
+                  id="settings-options-max-positions"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.optionsMaxPositions}
+                  onChange={(e) => handleChange('optionsMaxPositions', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-stop-loss" className="hud-label block mb-1">
+                  Stop Loss (%)
+                </label>
+                <input
+                  id="settings-options-stop-loss"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.optionsStopLossPct}
+                  onChange={(e) => handleChange('optionsStopLossPct', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-options-take-profit" className="hud-label block mb-1">
+                  Take Profit (%)
+                </label>
+                <input
+                  id="settings-options-take-profit"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.optionsTakeProfitPct}
+                  onChange={(e) => handleChange('optionsTakeProfitPct', Number(e.target.value))}
+                  disabled={!formData.optionsEnabled}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="llmModel" className="block text-sm text-gray-400 mb-1">
-              LLM Model
-            </label>
-            <select
-              id="llmModel"
-              value={formData.llmModel}
-              onChange={(e) => setFormData({ ...formData, llmModel: e.target.value })}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
-            >
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="claude-3-haiku">Claude 3 Haiku</option>
-              <option value="claude-3-sonnet">Claude 3 Sonnet</option>
-            </select>
+            <h3 className="hud-label mb-3 text-hud-cyan">Crypto Trading (24/7)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="hud-input w-4 h-4"
+                    checked={formData.cryptoEnabled}
+                    onChange={(e) => handleChange('cryptoEnabled', e.target.checked)}
+                  />
+                  <span className="hud-label">Enable Crypto Trading</span>
+                </label>
+                <p className="text-[9px] text-hud-text-dim mt-1">
+                  Trade crypto 24/7 based on momentum. Alpaca supports 20+ coins.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="settings-crypto-symbols" className="hud-label block mb-1">
+                  Symbols (comma-separated)
+                </label>
+                <input
+                  id="settings-crypto-symbols"
+                  type="text"
+                  className="hud-input w-full"
+                  value={(formData.cryptoSymbols || []).join(', ')}
+                  onChange={(e) =>
+                    handleChange(
+                      'cryptoSymbols',
+                      e.target.value
+                        .split(',')
+                        .map((symbol) => symbol.trim())
+                        .filter(Boolean)
+                    )
+                  }
+                  disabled={!formData.cryptoEnabled}
+                  placeholder="BTC/USD, ETH/USD, SOL/USD, DOGE/USD, AVAX/USD..."
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-crypto-momentum" className="hud-label block mb-1">
+                  Momentum Threshold (%)
+                </label>
+                <input
+                  id="settings-crypto-momentum"
+                  type="number"
+                  step="0.5"
+                  className="hud-input w-full"
+                  value={formData.cryptoMomentumThreshold}
+                  onChange={(e) => handleChange('cryptoMomentumThreshold', Number(e.target.value))}
+                  disabled={!formData.cryptoEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-crypto-max-position" className="hud-label block mb-1">
+                  Max Position ($)
+                </label>
+                <input
+                  id="settings-crypto-max-position"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.cryptoMaxPositionValue}
+                  onChange={(e) => handleChange('cryptoMaxPositionValue', Number(e.target.value))}
+                  disabled={!formData.cryptoEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-crypto-take-profit" className="hud-label block mb-1">
+                  Take Profit (%)
+                </label>
+                <input
+                  id="settings-crypto-take-profit"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.cryptoTakeProfitPct}
+                  onChange={(e) => handleChange('cryptoTakeProfitPct', Number(e.target.value))}
+                  disabled={!formData.cryptoEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-crypto-stop-loss" className="hud-label block mb-1">
+                  Stop Loss (%)
+                </label>
+                <input
+                  id="settings-crypto-stop-loss"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.cryptoStopLossPct}
+                  onChange={(e) => handleChange('cryptoStopLossPct', Number(e.target.value))}
+                  disabled={!formData.cryptoEnabled}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="hud-label mb-3 text-hud-warning">Stale Position Management</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="hud-input w-4 h-4"
+                    checked={formData.stalePositionEnabled}
+                    onChange={(e) => handleChange('stalePositionEnabled', e.target.checked)}
+                  />
+                  <span className="hud-label">Enable Stale Position Detection</span>
+                </label>
+              </div>
+              <div>
+                <label htmlFor="settings-stale-max-hold" className="hud-label block mb-1">
+                  Max Hold Days
+                </label>
+                <input
+                  id="settings-stale-max-hold"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.staleMaxHoldDays}
+                  onChange={(e) => handleChange('staleMaxHoldDays', Number(e.target.value))}
+                  disabled={!formData.stalePositionEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-stale-min-gain" className="hud-label block mb-1">
+                  Min Gain % to Keep
+                </label>
+                <input
+                  id="settings-stale-min-gain"
+                  type="number"
+                  step="0.5"
+                  className="hud-input w-full"
+                  value={formData.staleMinGainPct}
+                  onChange={(e) => handleChange('staleMinGainPct', Number(e.target.value))}
+                  disabled={!formData.stalePositionEnabled}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings-stale-volume-decay" className="hud-label block mb-1">
+                  Social Volume Decay
+                </label>
+                <input
+                  id="settings-stale-volume-decay"
+                  type="number"
+                  step="0.1"
+                  className="hud-input w-full"
+                  value={formData.staleSocialVolumeDecay}
+                  onChange={(e) => handleChange('staleSocialVolumeDecay', Number(e.target.value))}
+                  disabled={!formData.stalePositionEnabled}
+                />
+                <p className="text-[9px] text-hud-text-dim mt-1">
+                  Exit if volume drops to this % of entry
+                </p>
+              </div>
+              <div>
+                <label htmlFor="settings-stale-no-mentions" className="hud-label block mb-1">
+                  No Mentions Hours
+                </label>
+                <input
+                  id="settings-stale-no-mentions"
+                  type="number"
+                  className="hud-input w-full"
+                  value={formData.staleNoMentionsHours}
+                  onChange={(e) => handleChange('staleNoMentionsHours', Number(e.target.value))}
+                  disabled={!formData.stalePositionEnabled}
+                />
+                <p className="text-[9px] text-hud-text-dim mt-1">Exit if no mentions for N hours</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-4 pt-4 border-t border-hud-line">
+            <button type="button" className="hud-button" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" className="hud-button" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </button>
           </div>
         </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2 px-4 bg-gray-800 rounded hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onSave(formData)
-            }}
-            className="flex-1 py-2 px-4 bg-blue-600 rounded hover:bg-blue-500"
-          >
-            Save
-          </button>
-        </div>
-      </div>
+      </Panel>
     </div>
   )
 }

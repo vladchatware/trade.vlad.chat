@@ -149,7 +149,8 @@ export class PolicyEngine {
   }
 
   private checkNotionalLimit(ctx: PolicyContext, violations: PolicyViolation[]): void {
-    const notional = ctx.order.notional || ctx.order.qty! * ctx.order.estimatedPrice
+    const qty = ctx.order.qty ?? 0
+    const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
 
     if (notional > this.config.maxNotionalPerTrade) {
       violations.push({
@@ -167,7 +168,8 @@ export class PolicyEngine {
     warnings: PolicyWarning[]
   ): void {
     if (ctx.order.side === 'buy') {
-      const notional = ctx.order.notional || ctx.order.qty! * ctx.order.estimatedPrice
+      const qty = ctx.order.qty ?? 0
+      const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
       const positionPct = notional / ctx.account.equity
 
       if (positionPct > this.config.maxPositionPctEquity) {
@@ -188,7 +190,8 @@ export class PolicyEngine {
 
   private checkBuyingPower(ctx: PolicyContext, violations: PolicyViolation[]): void {
     if (ctx.order.side === 'buy') {
-      const notional = ctx.order.notional || ctx.order.qty! * ctx.order.estimatedPrice
+      const qty = ctx.order.qty ?? 0
+      const notional = ctx.order.notional ?? qty * ctx.order.estimatedPrice
 
       if (notional > ctx.account.buyingPower) {
         violations.push({

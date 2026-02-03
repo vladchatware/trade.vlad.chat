@@ -35,3 +35,20 @@ export const markUsed = mutation({
     })
   },
 })
+
+export const cleanupExpired = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const expired = await ctx.db
+      .query('orderApprovals')
+      .withIndex('by_expires', (q) => q.lt('expiresAt', now))
+      .collect()
+
+    for (const approval of expired) {
+      await ctx.db.delete(approval._id)
+    }
+
+    return { deleted: expired.length }
+  },
+})

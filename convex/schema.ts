@@ -35,24 +35,65 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_symbol', ['symbol']),
 
+  positionEntries: defineTable({
+    symbol: v.string(),
+    entryTime: v.number(),
+    entryPrice: v.number(),
+    entrySentiment: v.number(),
+    entryReason: v.string(),
+    entrySocialVolume: v.optional(v.number()),
+    entrySources: v.optional(v.array(v.string())),
+    peakPrice: v.optional(v.number()),
+    peakSentiment: v.optional(v.number()),
+  }).index('by_symbol', ['symbol']),
+
+  stalenessAnalysis: defineTable({
+    symbol: v.string(),
+    score: v.number(),
+    holdDays: v.number(),
+    gainPct: v.number(),
+    socialVolumeDecay: v.number(),
+    shouldExit: v.boolean(),
+    reasons: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index('by_symbol', ['symbol']),
+
   // Configuration & State
   config: defineTable({
     maxPositionValue: v.number(),
     maxPositions: v.number(),
     minSentimentScore: v.number(),
     minAnalystConfidence: v.number(),
+    sellSentimentThreshold: v.optional(v.number()),
     takeProfitPct: v.number(),
     stopLossPct: v.number(),
     positionSizePctOfCash: v.number(),
+    dataPollIntervalMs: v.optional(v.number()),
+    analystIntervalMs: v.optional(v.number()),
     llmModel: v.string(),
     llmAnalystModel: v.optional(v.string()),
+    llmMaxTokens: v.optional(v.number()),
     startingEquity: v.optional(v.number()),
     optionsEnabled: v.optional(v.boolean()),
     optionsMaxPctPerTrade: v.optional(v.number()),
     optionsMinConfidence: v.optional(v.number()),
+    optionsMinDte: v.optional(v.number()),
+    optionsMaxDte: v.optional(v.number()),
+    optionsTargetDelta: v.optional(v.number()),
+    optionsMaxPositions: v.optional(v.number()),
+    optionsStopLossPct: v.optional(v.number()),
+    optionsTakeProfitPct: v.optional(v.number()),
     cryptoEnabled: v.optional(v.boolean()),
     cryptoSymbols: v.optional(v.array(v.string())),
     cryptoMomentumThreshold: v.optional(v.number()),
+    cryptoMaxPositionValue: v.optional(v.number()),
+    cryptoTakeProfitPct: v.optional(v.number()),
+    cryptoStopLossPct: v.optional(v.number()),
+    stalePositionEnabled: v.optional(v.boolean()),
+    staleMaxHoldDays: v.optional(v.number()),
+    staleMinGainPct: v.optional(v.number()),
+    staleSocialVolumeDecay: v.optional(v.number()),
+    staleNoMentionsHours: v.optional(v.number()),
     updatedAt: v.number(),
   }),
 
@@ -62,6 +103,15 @@ export default defineSchema({
     dailyLossUsd: v.number(),
     dailyLossResetAt: v.number(),
     cooldownUntil: v.optional(v.number()),
+  }),
+
+  // Account data (real-time from Alpaca)
+  account: defineTable({
+    equity: v.number(),
+    cash: v.number(),
+    buyingPower: v.number(),
+    portfolioValue: v.number(),
+    updatedAt: v.number(),
   }),
 
   // Order approvals (MCP pattern)
@@ -124,6 +174,54 @@ export default defineSchema({
     updatedAt: v.number(),
   }),
 
+  overnightActivity: defineTable({
+    signalsGathered: v.number(),
+    signalsResearched: v.number(),
+    buySignals: v.number(),
+    twitterConfirmations: v.number(),
+    premarketPlanReady: v.boolean(),
+    lastUpdated: v.number(),
+  }),
+
+  premarketPlans: defineTable({
+    timestamp: v.number(),
+    summary: v.string(),
+    recommendations: v.array(
+      v.object({
+        symbol: v.string(),
+        action: v.union(v.literal('BUY'), v.literal('SELL'), v.literal('HOLD'), v.literal('SKIP')),
+        confidence: v.number(),
+        reasoning: v.string(),
+        entry_price: v.optional(v.number()),
+        target_price: v.optional(v.number()),
+        stop_loss: v.optional(v.number()),
+      })
+    ),
+    highConvictionPlays: v.array(v.string()),
+    marketOutlook: v.string(),
+  }).index('by_timestamp', ['timestamp']),
+
+  twitterConfirmations: defineTable({
+    symbol: v.string(),
+    query: v.string(),
+    tweetCount: v.number(),
+    sentiment: v.number(),
+    bullishCount: v.number(),
+    bearishCount: v.number(),
+    influencerMentions: v.number(),
+    averageEngagement: v.number(),
+    timestamp: v.number(),
+  })
+    .index('by_symbol', ['symbol'])
+    .index('by_timestamp', ['timestamp']),
+
+  positionHistory: defineTable({
+    symbol: v.string(),
+    prices: v.array(v.number()),
+    timestamps: v.array(v.number()),
+    updatedAt: v.number(),
+  }).index('by_symbol', ['symbol']),
+
   activityLogs: defineTable({
     agent: v.string(),
     action: v.string(),
@@ -133,6 +231,15 @@ export default defineSchema({
   })
     .index('by_timestamp', ['timestamp'])
     .index('by_agent', ['agent']),
+
+  rawEvents: defineTable({
+    source: v.string(),
+    sourceId: v.string(),
+    rawContent: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_source_sourceId', ['source', 'sourceId'])
+    .index('by_created', ['createdAt']),
 
   // MCP Tool logs
   toolLogs: defineTable({
