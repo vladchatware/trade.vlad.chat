@@ -23,7 +23,6 @@ src/index-v2.ts
 wrangler.v2.toml
 
 # Docs (hosted separately)
-docs/
 
 # -----------------------------------------------------------------------------
 # Dependencies

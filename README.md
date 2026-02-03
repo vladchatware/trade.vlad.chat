@@ -261,6 +261,10 @@ mahoraga/
 └── migrations/               # Database migrations
 ```
 
+## Documentation
+
+See `docs/README.md` for architecture, agent runtime, and development notes.
+
 ## Troubleshooting
 
 ### "Failed to connect to MCP server"
