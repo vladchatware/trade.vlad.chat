@@ -15,6 +15,13 @@ type DailyResetResult = { reset: boolean; created: boolean }
 type SecIngestResult =
   | { status: 'success'; inserted: number }
   | { status: 'skipped'; reason: 'market_closed' | 'kill_switch_active'; inserted: number }
+type HourlyCacheRefreshResult = {
+  status: 'ok'
+  candidates: number
+  refreshed: number
+  skippedFresh: number
+  failed: number
+}
 
 export function buildMarketOpenPrepResult(
   riskState: RiskStateLite | null,
@@ -121,7 +128,7 @@ export const midnightReset = action({
 
 export const hourlyCacheRefresh = action({
   args: {},
-  handler: async () => {
-    return { status: 'noop' as const }
+  handler: async (ctx): Promise<HourlyCacheRefreshResult> => {
+    return (await ctx.runAction(api.signals.researchCycle.run, {})) as HourlyCacheRefreshResult
   },
 })

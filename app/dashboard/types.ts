@@ -36,6 +36,7 @@ export interface Config {
 }
 
 export interface SignalResearch {
+  symbol?: string
   verdict?: string
   entryQuality?: string
   reasoning?: string

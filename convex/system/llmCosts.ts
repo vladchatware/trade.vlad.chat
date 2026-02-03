@@ -49,7 +49,7 @@ export const track = mutation({
     model: v.string(),
     tokensIn: v.number(),
     tokensOut: v.number(),
-    costUsd: v.number(),
+    costUsd: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert('toolLogs', {
@@ -60,7 +60,7 @@ export const track = mutation({
       outputJson: JSON.stringify({
         tokens_in: args.tokensIn,
         tokens_out: args.tokensOut,
-        cost_usd: args.costUsd,
+        ...(args.costUsd !== undefined ? { cost_usd: args.costUsd } : {}),
       }),
       providerCalls: 1,
       latencyMs: 0,

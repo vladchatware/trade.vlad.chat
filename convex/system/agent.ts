@@ -1,6 +1,6 @@
 'use node'
 
-import { openai } from '@ai-sdk/openai'
+import { createOpenAI } from '@ai-sdk/openai'
 import { Agent, createThread } from '@convex-dev/agent'
 import { tool } from 'ai'
 import { z } from 'zod'
@@ -28,6 +28,20 @@ export function buildFirstAgentPrompt(snapshot: CycleSnapshot): string {
   ].join('\n')
 }
 
+function buildLanguageModel() {
+  const model = process.env.LLM_AGENT_MODEL || 'gpt-4o-mini'
+  const apiKey = process.env.AI_GATEWAY_API_KEY as string
+  const baseURL = (process.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1').replace(
+    /\/$/,
+    ''
+  )
+  const gateway = createOpenAI({
+    apiKey,
+    baseURL,
+  })
+  return gateway.chat(model)
+}
+
 const classifyIntent = tool({
   description: 'Convert free-form reasoning into one strict intent label.',
   inputSchema: z.object({ decision: z.enum(['HOLD', 'BUY_CANDIDATE', 'SELL_CANDIDATE']) }),
@@ -38,7 +52,7 @@ const classifyIntent = tool({
 
 export const tradingAgent = new Agent(components.agent, {
   name: 'MAHORAGA V2 Agent',
-  languageModel: openai.chat(process.env.LLM_AGENT_MODEL || 'gpt-4o-mini'),
+  languageModel: buildLanguageModel(),
   instructions:
     'You are a cautious trading copilot. Prioritize risk controls and deterministic reasoning over action-taking.',
   tools: {
@@ -50,10 +64,6 @@ export const tradingAgent = new Agent(components.agent, {
 export const runCycle = action({
   args: {},
   handler: async (ctx) => {
-    if (!process.env.OPENAI_API_KEY) {
-      return { status: 'skipped', reason: 'missing_openai_api_key' as const }
-    }
-
     const [status, riskState] = await Promise.all([
       ctx.runQuery(api.system.status.get, {}),
       ctx.runQuery(api.system.riskState.get, {}),

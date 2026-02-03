@@ -45,7 +45,20 @@ export default function Dashboard() {
   const positions: PositionRow[] = dbStatus?.positions || []
   const signals: SignalRow[] = dbStatus?.signals || []
   const logs: LogRow[] = dbStatus?.logs || []
-  const signalResearch = (dbStatus?.signalResearch ?? {}) as Record<string, SignalResearch>
+  const signalResearchRows = (dbStatus?.signalResearch ?? []) as Array<
+    SignalResearch & { symbol?: string; timestamp?: number }
+  >
+  const signalResearch = signalResearchRows.reduce(
+    (acc, row) => {
+      if (!row.symbol) return acc
+      const existing = acc[row.symbol]
+      if (!existing || (row.timestamp ?? 0) > (existing.timestamp ?? 0)) {
+        acc[row.symbol] = row
+      }
+      return acc
+    },
+    {} as Record<string, SignalResearch>
+  )
   const config: Config = dbStatus?.config || defaultConfig
 
   const portfolioValue = portfolio.portfolioValue ?? 0
