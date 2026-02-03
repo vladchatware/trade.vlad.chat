@@ -1,70 +1,70 @@
 'use node'
 
-import { createOpenAI } from '@ai-sdk/openai'
-import { Agent, createThread } from '@convex-dev/agent'
-import { tool } from 'ai'
+import { createThread, searchThreadTitles } from '@convex-dev/agent'
 import { z } from 'zod'
+import type { withTradingConfigDefaults } from '../../shared/tradingConfig'
 import { api, components } from '../_generated/api'
-import { action } from '../_generated/server'
+import type { Doc } from '../_generated/dataModel'
+import { type ActionCtx, action } from '../_generated/server'
+import { createTradingCycleAgent } from '../agents'
 
 type CycleSnapshot = {
-  account: unknown
-  positions: unknown[]
-  signals: unknown[]
-  marketClock: unknown
-  riskState: unknown
-  config: unknown
+  account: Doc<'account'> | null
+  positions: Doc<'positions'>[]
+  signals: Doc<'signals'>[]
+  marketClock: Doc<'marketClock'> | null
+  riskState: Doc<'riskState'> | null
+  config: Doc<'config'> | (ReturnType<typeof withTradingConfigDefaults> & { updatedAt: number })
 }
 
-export function buildFirstAgentPrompt(snapshot: CycleSnapshot): string {
-  return [
-    'You are MAHORAGA_TRADER_V2 (bootstrap mode).',
-    'You are running in Convex cron and must reason from Convex state.',
-    'Output one of: HOLD, BUY_CANDIDATE, SELL_CANDIDATE.',
-    'Do not invent external data. Mention uncertainty explicitly.',
-    '',
-    'Snapshot:',
-    JSON.stringify(snapshot),
-  ].join('\n')
+type StatusSnapshot = {
+  account: CycleSnapshot['account']
+  positions: CycleSnapshot['positions']
+  signals: CycleSnapshot['signals']
+  marketClock: CycleSnapshot['marketClock']
+  config: CycleSnapshot['config']
 }
 
-function buildLanguageModel() {
-  const model = process.env.LLM_AGENT_MODEL || 'gpt-4o-mini'
-  const apiKey = process.env.AI_GATEWAY_API_KEY as string
-  const baseURL = (process.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1').replace(
-    /\/$/,
-    ''
-  )
-  const gateway = createOpenAI({
-    apiKey,
-    baseURL,
+type RunCycleResult =
+  | { status: 'skipped'; reason: 'kill_switch_active' }
+  | { status: 'success'; decision: 'HOLD' | 'BUY_CANDIDATE' | 'SELL_CANDIDATE'; rationale: string }
+
+const TradingDecisionSchema = z.object({
+  decision: z.enum(['HOLD', 'BUY_CANDIDATE', 'SELL_CANDIDATE']),
+  rationale: z.string().min(1),
+})
+
+export function buildTradingCyclePrompt(snapshot: CycleSnapshot): string {
+  return `Task: choose exactly one label for this cycle: HOLD, BUY_CANDIDATE, or SELL_CANDIDATE.
+Return the label and a brief rationale grounded in the snapshot.
+
+Snapshot:
+${JSON.stringify(snapshot)}`
+}
+
+export function getTradingCycleThreadTitle(now = new Date()): string {
+  return `trading-cycle-${now.toISOString().slice(0, 10)}`
+}
+
+async function getOrCreateTradingCycleThread(ctx: ActionCtx): Promise<string> {
+  const title = getTradingCycleThreadTitle()
+  const existing = await searchThreadTitles(ctx, components.agent, {
+    query: title,
+    limit: 10,
   })
-  return gateway.chat(model)
+  const activeThread = existing.find((thread) => thread.title === title)
+  if (activeThread) return activeThread._id
+
+  return createThread(ctx, components.agent, {
+    title,
+    summary: 'Daily thread for scheduled trading cycle decisions.',
+  })
 }
-
-const classifyIntent = tool({
-  description: 'Convert free-form reasoning into one strict intent label.',
-  inputSchema: z.object({ decision: z.enum(['HOLD', 'BUY_CANDIDATE', 'SELL_CANDIDATE']) }),
-  execute: async (args) => {
-    return { normalizedDecision: args.decision }
-  },
-})
-
-export const tradingAgent = new Agent(components.agent, {
-  name: 'MAHORAGA V2 Agent',
-  languageModel: buildLanguageModel(),
-  instructions:
-    'You are a cautious trading copilot. Prioritize risk controls and deterministic reasoning over action-taking.',
-  tools: {
-    classifyIntent,
-  },
-  maxSteps: 3,
-})
 
 export const runCycle = action({
   args: {},
-  handler: async (ctx) => {
-    const [status, riskState] = await Promise.all([
+  handler: async (ctx): Promise<RunCycleResult> => {
+    const [status, riskState]: [StatusSnapshot, Doc<'riskState'> | null] = await Promise.all([
       ctx.runQuery(api.system.status.get, {}),
       ctx.runQuery(api.system.riskState.get, {}),
     ])
@@ -73,8 +73,10 @@ export const runCycle = action({
       return { status: 'skipped', reason: 'kill_switch_active' as const }
     }
 
-    const threadId = await createThread(ctx, components.agent)
-    const prompt = buildFirstAgentPrompt({
+    const threadId = await getOrCreateTradingCycleThread(ctx)
+    const configuredModel: string = status.config.llmModel
+    const tradingAgent = createTradingCycleAgent(configuredModel)
+    const prompt = buildTradingCyclePrompt({
       account: status.account,
       positions: status.positions,
       signals: status.signals,
@@ -83,14 +85,29 @@ export const runCycle = action({
       config: status.config,
     })
 
-    const result = await tradingAgent.generateText(ctx, { threadId }, { prompt })
+    const result = await tradingAgent.generateObject(
+      ctx,
+      { threadId },
+      {
+        schema: TradingDecisionSchema,
+        prompt,
+        temperature: 0.2,
+      }
+    )
 
     await ctx.runMutation(api.system.activityLogs.create, {
-      agent: 'ConvexAgentV2',
+      agent: 'TradingCycleAgent',
       action: 'cycle_complete',
-      detailsJson: JSON.stringify({ text: result.text }),
+      detailsJson: JSON.stringify({
+        decision: result.object.decision,
+        rationale: result.object.rationale,
+      }),
     })
 
-    return { status: 'success' as const, text: result.text }
+    return {
+      status: 'success' as const,
+      decision: result.object.decision,
+      rationale: result.object.rationale,
+    }
   },
 })

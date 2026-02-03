@@ -1,12 +1,11 @@
 'use node'
 
-import { createOpenAI } from '@ai-sdk/openai'
-import { generateObject } from 'ai'
+import { createThread } from '@convex-dev/agent'
 import { v } from 'convex/values'
 import { z } from 'zod'
-import { DEFAULT_LLM_MODEL } from '../../shared/llmCatalog'
-import { api } from '../_generated/api'
-import { action } from '../_generated/server'
+import { api, components } from '../_generated/api'
+import { type ActionCtx, action } from '../_generated/server'
+import { createSignalResearchAgent } from '../agents'
 
 const RESEARCH_ENTRY_QUALITY_VALUES = ['excellent', 'good', 'fair', 'poor'] as const
 
@@ -65,32 +64,26 @@ export function pickSignalResearchCandidates(
   return picked
 }
 
-async function analyzeSignal(args: { symbol: string; sentiment: number; volume: number }) {
+async function analyzeSignal(
+  ctx: ActionCtx,
+  args: { symbol: string; sentiment: number; volume: number; modelId: string }
+) {
   const prompt = `Analyze ${args.symbol} for potential trading opportunity.
 Current sentiment: ${(args.sentiment * 100).toFixed(0)}%
 Social volume: ${args.volume}`
 
-  const model = DEFAULT_LLM_MODEL
-  const baseURL = (process.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1').replace(
-    /\/$/,
-    ''
+  const model = args.modelId
+  const signalResearchAgent = createSignalResearchAgent(model)
+  const threadId = await createThread(ctx, components.agent)
+  const result = await signalResearchAgent.generateObject(
+    ctx,
+    { threadId },
+    {
+      schema: ResearchSignalSchema,
+      prompt,
+      temperature: 0.3,
+    }
   )
-  const gateway = createOpenAI({
-    apiKey: process.env.AI_GATEWAY_API_KEY as string,
-    baseURL,
-  })
-  const result = await generateObject({
-    model: gateway.chat(model),
-    schema: ResearchSignalSchema,
-    messages: [
-      {
-        role: 'system',
-        content: 'You are a stock market analyst. Be concise and accurate.',
-      },
-      { role: 'user', content: prompt },
-    ],
-    temperature: 0.3,
-  })
 
   const parsed: ResearchSignalResult = {
     verdict: result.object.verdict,
@@ -128,7 +121,12 @@ export const researchSignal = action({
     volume: v.number(),
   },
   handler: async (ctx, args): Promise<ResearchSignalResult> => {
-    const analyzed = await analyzeSignal(args)
+    const config = await ctx.runQuery(api.system.config.get, {})
+    const modelId = config.llmAnalystModel || config.llmModel
+    const analyzed = await analyzeSignal(ctx, {
+      ...args,
+      modelId,
+    })
 
     await ctx.runMutation(api.system.llmCosts.track, {
       model: analyzed.model,

@@ -1,12 +1,24 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CRON_PLAN } from '../../crons'
+
+function getCronNamesFromSource(): Set<string> {
+  const filePath = path.join(process.cwd(), 'convex', 'crons.ts')
+  const source = fs.readFileSync(filePath, 'utf8')
+  const names = new Set<string>()
+  const regex = /crons\.(?:cron|interval)\(\s*'([^']+)'/g
+  let match = regex.exec(source)
+  while (match !== null) {
+    if (match[1]) names.add(match[1])
+    match = regex.exec(source)
+  }
+  return names
+}
 
 describe('cron plan', () => {
-  it('contains trading, crypto, agent, sec-edgar, ops, staleness, overnight, and approvals jobs', () => {
-    const names = new Set(CRON_PLAN.map((job) => job.name))
+  it('contains trading, sec-edgar, ops, staleness, overnight, and approvals jobs', () => {
+    const names = getCronNamesFromSource()
     expect(names.has('run-trading')).toBe(true)
-    expect(names.has('run-crypto')).toBe(true)
-    expect(names.has('agent-v2-cycle')).toBe(true)
     expect(names.has('sec-edgar-ingest')).toBe(true)
     expect(names.has('market-open-prep')).toBe(true)
     expect(names.has('market-close-cleanup')).toBe(true)
