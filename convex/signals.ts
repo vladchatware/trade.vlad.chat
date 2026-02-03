@@ -63,7 +63,7 @@ function analyzeSentiment(messages: StockTwitsMessage[]) {
   }
 }
 
-// StockTwits signal gathering - ported from agent-v1.mjs
+// StockTwits signal gathering
 export const gatherSignals = action({
   args: {},
   handler: async (ctx) => {

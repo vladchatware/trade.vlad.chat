@@ -18,8 +18,6 @@ trade-journal.json
 
 # Private agent (contains proprietary trading logic)
 agent-v2.mjs
-src/durable-objects/trading-agent-v2.ts
-src/index-v2.ts
 wrangler.v2.toml
 
 # Docs (hosted separately)
@@ -37,16 +35,19 @@ dist/
 build/
 *.js.map
 .wrangler/
+.next/
+.turbo/
+out/
 
 # Turborepo
-.turbo/
 packages/*/dist/
 packages/*/.turbo/
 packages/*/_generated/
 
 # Next.js
-.next/
-out/
+# Local tool state
+.opencode/
+.planning/
 
 # -----------------------------------------------------------------------------
 # Logs
@@ -55,6 +56,9 @@ out/
 logs/
 agent.log
 mcp.log
+.agent.log
+.app.log
+.mcp.log
 dashboard/*.log
 
 # -----------------------------------------------------------------------------
@@ -92,6 +96,9 @@ ehthumbs.db
 # TypeScript
 # -----------------------------------------------------------------------------
 *.tsbuildinfo
+
+# Bun-only lockfile policy
+package-lock.json
 
 # -----------------------------------------------------------------------------
 # Test Coverage

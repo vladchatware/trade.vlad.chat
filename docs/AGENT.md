@@ -15,12 +15,12 @@ bun run worker/index.ts
 or via root script:
 
 ```bash
-bun run worker/index.ts
+bun run worker:dev
 ```
 
 ## Required env
 
-- `MCP_URL` (default: `http://localhost:8787/mcp`)
+- `MCP_URL` (default: `http://localhost:3000/api/mcp`)
 - `ALPACA_API_KEY`, `ALPACA_API_SECRET`, `ALPACA_PAPER`
 - `AI_GATEWAY_API_KEY`, `AI_GATEWAY_URL`
 - `KILL_SWITCH_SECRET`

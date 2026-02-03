@@ -22,6 +22,28 @@ Every run must follow this cycle:
    - Use small atomic commits.
 6. **Cycle report**
    - Always output: objective, changed files, validation results, risks, next cycle candidate.
+   - Keep reports laconic: short bullets, no long narrative.
+
+## Communication Contract (Laconic + Robust)
+
+- Be concise by default:
+  - Use short, direct sentences.
+  - Prefer bullets over paragraphs.
+  - Skip non-essential background unless asked.
+- Be robust by default:
+  - State assumptions explicitly.
+  - Call out blockers immediately.
+  - Do not claim success without validation evidence.
+- Response size targets:
+  - Normal update: 5-10 lines.
+  - Substantial change: 12-20 lines max.
+  - Include extra detail only when requested.
+
+## Decision Rules
+
+- If two options are both viable, choose the safer/simpler one.
+- If a change increases risk, add a guardrail or test in the same cycle.
+- If uncertain, stop and present 2-3 concrete options with tradeoffs.
 
 ## Safety Rules (Trading/Critical Logic)
 
@@ -77,3 +99,4 @@ Next cycle candidate:
 - <one clear next objective>
 ```
 
+Keep this template terse and evidence-first.

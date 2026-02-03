@@ -5,9 +5,9 @@ Autonomous trading system built around **Next.js + Convex + Bun worker**.
 ## Runtime Layout
 
 - `app/` + `components/` — Next.js dashboard UI
+- `app/api/mcp/route.ts` — local MCP server hosted inside Next.js via `mcp-handler`
 - `convex/` — data model, actions, queries, and scheduled jobs
 - `worker/` — Bun worker/orchestrator for continuous execution
-- `src/` — MCP tool server currently used by the worker (`MCP_URL`)
 
 ## Quick Start
 
@@ -20,8 +20,8 @@ bun install
 ### 2) Configure env
 
 Create:
-- `.env.local` for Next/Convex client env
-- `.dev.vars` for worker + MCP secrets
+- `.env.local` for Next/Convex + MCP env
+- `.dev.vars` for worker runtime env (optional if mirrored in `.env.local`)
 
 Required keys (minimum):
 
@@ -48,19 +48,14 @@ This starts:
 
 ### 4) Ensure MCP server is running for worker tools
 
-The worker currently expects an MCP endpoint via `MCP_URL` (default: `http://localhost:8787/mcp`).
-
-If you run the local MCP implementation in this repo:
-
-```bash
-bunx wrangler dev --config wrangler.toml
-```
+The worker expects `MCP_URL` and now defaults to `http://localhost:3000/api/mcp`, which is served by the Next.js app in `bun run dev`.
 
 ## Scripts
 
 - `bun run dev` — Convex + Next.js + worker
 - `bun run convex:dev` — Convex only
 - `bun run next:dev` — Next.js only
+- `bun run worker:dev` — worker only
 - `bun run build` — Next.js production build
 - `bun run test` — unit tests
 - `bun run typecheck` — TypeScript checks
@@ -70,4 +65,3 @@ bunx wrangler dev --config wrangler.toml
 
 - Keep: Next.js dashboard, Convex backend, Bun worker
 - Removed: legacy Vite dashboard and old `agent-v1.mjs`
-- Planned next: move worker off local MCP dependency so `src/` + Wrangler can be fully sunset

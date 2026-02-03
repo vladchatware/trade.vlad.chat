@@ -6,7 +6,7 @@ import { api } from './_generated/api'
 import { action } from './_generated/server'
 import { createAlpacaClient } from './providers/alpaca'
 
-// Main trading loop - ported from agent-v1.mjs
+// Main trading loop for market-hours equities execution
 export const runTrading = action({
   args: {},
   handler: async (ctx) => {
@@ -26,6 +26,7 @@ export const runTrading = action({
       sentiment?: number
       symbol: string
       price?: number
+      volume?: number
     }
 
     // Fetch current state
@@ -76,16 +77,17 @@ export const runTrading = action({
       const heldSymbols = new Set(positions.map((p) => p.symbol))
       const candidates = filteredSignals.filter((s) => !heldSymbols.has(s.symbol))
 
-      for (const signal of candidates.slice(0, 1)) {
+      const bestCandidate = candidates[0]
+      if (bestCandidate) {
         const positionSize = Math.min(
           config.maxPositionValue,
           account.cash * (config.positionSizePctOfCash / 100)
         )
 
         const preview = await ctx.runAction(api.tradingActions.previewOrder, {
-          symbol: signal.symbol,
+          symbol: bestCandidate.symbol,
           side: 'buy',
-          qty: signal.price ? positionSize / signal.price : 0,
+          qty: bestCandidate.price ? positionSize / bestCandidate.price : 0,
           orderType: 'market',
         })
 

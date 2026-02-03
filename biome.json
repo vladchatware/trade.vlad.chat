@@ -49,14 +49,14 @@
       "dist",
       ".next",
       ".turbo",
+      ".wrangler",
       ".opencode",
       "_generated",
       "*.d.ts",
       "*.config.js",
       "*.config.ts",
-      "dashboard/src/**/*",
-      "src/**/*",
-      "agent-v1.mjs"
+      "agent-config.json",
+      "agent-logs.json"
     ]
   }
 }

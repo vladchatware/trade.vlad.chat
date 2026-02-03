@@ -27,19 +27,14 @@ This runs Convex, Next.js, and worker together.
 
 ## Worker MCP dependency
 
-The worker expects `MCP_URL` (default `http://localhost:8787/mcp`).
-
-If using the in-repo MCP server, start it separately:
-
-```bash
-bunx wrangler dev --config wrangler.toml
-```
+The worker expects `MCP_URL` (default `http://localhost:3000/api/mcp`).
+This endpoint is served by Next.js (`app/api/mcp/route.ts`), so it comes up automatically with `bun run dev`.
 
 ## Helpful Commands
 
 - `bun run next:dev`
 - `bun run convex:dev`
-- `bun run worker/index.ts`
+- `bun run worker:dev`
 - `bun run test`
 - `bun run typecheck`
 - `bun run lint`
