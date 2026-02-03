@@ -120,7 +120,7 @@ describe('convex-sync', () => {
       now: 1700000000000,
     })
 
-    expect(mutation).toHaveBeenCalledWith('marketClock:upsert', {
+    expect(mutation).toHaveBeenCalledWith('portfolio/marketClock:upsert', {
       isOpen: true,
       nextOpen: '2026-02-03T14:30:00Z',
       nextClose: '2026-02-03T21:00:00Z',
@@ -148,7 +148,7 @@ describe('convex-sync', () => {
       now: 1700000000000,
     })
 
-    expect(mutation).toHaveBeenCalledWith('signalsQueries:create', {
+    expect(mutation).toHaveBeenCalledWith('signals/queries:create', {
       symbol: 'NVDA',
       source: 'stocktwits',
       sentiment: 0.8,

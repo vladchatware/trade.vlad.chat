@@ -17,7 +17,7 @@ interface PortfolioMetrics {
 
 export function usePortfolio(): PortfolioMetrics {
   // Get all data from Convex via WebSocket (real-time updates)
-  const dbStatus = useQuery(api.status.get)
+  const dbStatus = useQuery(api.system.status.get)
 
   const positions = dbStatus?.positions || []
   const account = dbStatus?.account

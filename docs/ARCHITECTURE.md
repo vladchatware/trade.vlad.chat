@@ -17,18 +17,18 @@
 
 All cron jobs are registered in `convex/crons.ts`.
 
-- `run-trading` (`*/2 13-20 * * 1-5`) -> `api.tradingAgent.runTrading`
-- `run-crypto` (every 120s) -> `api.cryptoAgent.runCryptoTrading`
-- `agent-v2-cycle` (`*/10 13-20 * * 1-5`) -> `api.agent.runCycle`
-- `sec-edgar-ingest` (`*/5 13-20 * * 1-5`) -> `api.operations.ingestSecEdgar`
-- `market-open-prep` (`0 14 * * 1-5`) -> `api.operations.marketOpenPrep`
-- `market-close-cleanup` (`30 21 * * 1-5`) -> `api.operations.marketCloseCleanup`
-- `midnight-reset` (`0 5 * * *`) -> `api.operations.midnightReset`
-- `hourly-cache-refresh` (`0 * * * *`) -> `api.operations.hourlyCacheRefresh`
-- `cleanup-order-approvals` (every 15m) -> `api.orderApprovals.cleanupExpired`
-- `compute-staleness` (every 10m) -> `api.staleness.compute`
-- `overnight-activity-rollup` (`0 * * * *`) -> `api.overnight.computeOvernightActivity`
-- `premarket-plan` (`30 12 * * 1-5`) -> `api.overnight.generatePremarketPlan`
+- `run-trading` (`*/2 13-20 * * 1-5`) -> `api.trading.agent.runTrading`
+- `run-crypto` (every 120s) -> `api.trading.cryptoAgent.runCryptoTrading`
+- `agent-v2-cycle` (`*/10 13-20 * * 1-5`) -> `api.system.agent.runCycle`
+- `sec-edgar-ingest` (`*/5 13-20 * * 1-5`) -> `api.system.operations.ingestSecEdgar`
+- `market-open-prep` (`0 14 * * 1-5`) -> `api.system.operations.marketOpenPrep`
+- `market-close-cleanup` (`30 21 * * 1-5`) -> `api.system.operations.marketCloseCleanup`
+- `midnight-reset` (`0 5 * * *`) -> `api.system.operations.midnightReset`
+- `hourly-cache-refresh` (`0 * * * *`) -> `api.system.operations.hourlyCacheRefresh`
+- `cleanup-order-approvals` (every 15m) -> `api.trading.orderApprovals.cleanupExpired`
+- `compute-staleness` (every 10m) -> `api.portfolio.staleness.compute`
+- `overnight-activity-rollup` (`0 * * * *`) -> `api.portfolio.overnight.computeOvernightActivity`
+- `premarket-plan` (`30 12 * * 1-5`) -> `api.portfolio.overnight.generatePremarketPlan`
 
 ## Notes
 

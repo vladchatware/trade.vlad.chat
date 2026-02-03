@@ -5,7 +5,7 @@ import { useQuery } from 'convex/react'
 
 export function usePortfolioHistory() {
   // Get all data from Convex via WebSocket (real-time updates)
-  const status = useQuery(api.status.get)
+  const status = useQuery(api.system.status.get)
 
   const portfolioSnapshots = status?.portfolioSnapshots || []
   const account = status?.account

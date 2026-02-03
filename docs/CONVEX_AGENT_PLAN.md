@@ -11,10 +11,10 @@ Rebuild trading decision flow so Convex Agent runs in cron, reads Convex state, 
 
 ## Implementation Steps
 1. Define Convex Agent component in `convex/convex.config.ts`.
-2. Define a module-level `Agent` instance in `convex/convexAgent.ts`.
+2. Define a module-level `Agent` instance in `convex/system/agent.ts`.
 3. Use `createThread` + `agent.generateText` inside `runCycle` action.
 4. Feed decision prompt from Convex snapshot.
-5. Keep cron entrypoint on `api.convexAgent.runCycle`.
+5. Keep cron entrypoint on `api.system.agent.runCycle`.
 6. Add/maintain tests for prompt contract and decision-cycle scaffolding.
 
 ## Status

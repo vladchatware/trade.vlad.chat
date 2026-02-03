@@ -35,12 +35,12 @@ import { defaultConfig } from './dashboard/utils'
 export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false)
 
-  const dbStatus = useQuery(api.status.get)
+  const dbStatus = useQuery(api.system.status.get)
   const portfolio = usePortfolio()
   const time = useClock()
   const portfolioHistory = usePortfolioHistory()
 
-  const updateConfig = useMutation(api.config.update)
+  const updateConfig = useMutation(api.system.config.update)
 
   const positions: PositionRow[] = dbStatus?.positions || []
   const signals: SignalRow[] = dbStatus?.signals || []

@@ -20,13 +20,13 @@ export type SyncResult = {
   accountSynced: boolean
 }
 
-const ACCOUNT_SYNC_MUTATION = 'account:updateFromWebSocket'
-const PORTFOLIO_SNAPSHOT_MUTATION = 'portfolio:createSnapshot'
-const POSITION_SYNC_MUTATION = 'positions:updateFromWebSocket'
-const POSITION_HISTORY_MUTATION = 'positionHistory:upsert'
-const POSITIONS_CLEANUP_MUTATION = 'positions:cleanupClosed'
-const MARKET_CLOCK_UPSERT_MUTATION = 'marketClock:upsert'
-const SIGNAL_CREATE_MUTATION = 'signalsQueries:create'
+const ACCOUNT_SYNC_MUTATION = 'portfolio/account:updateFromWebSocket'
+const PORTFOLIO_SNAPSHOT_MUTATION = 'portfolio/snapshots:createSnapshot'
+const POSITION_SYNC_MUTATION = 'portfolio/positions:updateFromWebSocket'
+const POSITION_HISTORY_MUTATION = 'portfolio/positionHistory:upsert'
+const POSITIONS_CLEANUP_MUTATION = 'portfolio/positions:cleanupClosed'
+const MARKET_CLOCK_UPSERT_MUTATION = 'portfolio/marketClock:upsert'
+const SIGNAL_CREATE_MUTATION = 'signals/queries:create'
 
 export function createConvexClient(url: string): ConvexClientLike {
   return new ConvexHttpClient(url) as unknown as ConvexClientLike
