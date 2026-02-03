@@ -9,9 +9,11 @@ export const create = mutation({
     details: v.optional(v.record(v.string(), v.any())),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { details, ...rest } = args
     return await ctx.db.insert('activityLogs', {
-      ...args,
-      detailsJson: args.details ? JSON.stringify(args.details) : undefined,
+      ...rest,
+      detailsJson: details ? JSON.stringify(details) : undefined,
       timestamp: Date.now(),
     })
   },

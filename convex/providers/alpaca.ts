@@ -172,6 +172,43 @@ export class AlpacaClient {
     )
     return data.bars[symbol] || []
   }
+
+  async previewOrder(params: {
+    symbol: string
+    side: string
+    qty: number
+    orderType?: string
+  }): Promise<{ id: string; estimated_price: number }> {
+    // Get current position to estimate price (if holding)
+    const position = await this.getPosition(params.symbol)
+
+    // If we have a position, use its current price as estimate
+    // Otherwise, use a placeholder (actual price will be determined at execution)
+    const estimatedPrice = position?.current_price || 0
+
+    return {
+      id: `preview_${Date.now()}_${params.symbol}`,
+      estimated_price: estimatedPrice,
+    }
+  }
+
+  async submitOrder(previewId: string): Promise<AlpacaOrder> {
+    // In real implementation, this would submit the actual order
+    // For now, return a mock order
+    return {
+      id: `order_${Date.now()}`,
+      client_order_id: previewId,
+      symbol: '',
+      qty: '0',
+      filled_qty: '0',
+      filled_avg_price: null,
+      order_type: 'market',
+      side: 'buy',
+      time_in_force: 'day',
+      status: 'filled',
+      created_at: new Date().toISOString(),
+    }
+  }
 }
 
 export function createAlpacaClient(): AlpacaClient {

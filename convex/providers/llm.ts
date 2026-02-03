@@ -1,5 +1,9 @@
-const VERCEL_AI_GATEWAY_URL = process.env.VERCEL_AI_GATEWAY_URL
-const VERCEL_AI_GATEWAY_TOKEN = process.env.VERCEL_AI_GATEWAY_TOKEN
+// AI Gateway Configuration
+// These are read from environment variables set in Convex dashboard or .env.local
+const getGatewayConfig = () => ({
+  url: process.env.AI_GATEWAY_URL || 'https://ai-gateway.vercel.sh/v1',
+  key: process.env.AI_GATEWAY_API_KEY,
+})
 
 export interface CompletionParams {
   model: string
@@ -19,23 +23,31 @@ export interface CompletionResult {
 }
 
 export async function completeWithGateway(params: CompletionParams): Promise<CompletionResult> {
-  if (!VERCEL_AI_GATEWAY_URL || !VERCEL_AI_GATEWAY_TOKEN) {
-    throw new Error('VERCEL_AI_GATEWAY_URL and VERCEL_AI_GATEWAY_TOKEN must be set')
+  const config = getGatewayConfig()
+
+  if (!config.key) {
+    throw new Error('AI_GATEWAY_API_KEY environment variable must be set')
   }
 
-  const response = await fetch(`${VERCEL_AI_GATEWAY_URL}/chat/completions`, {
+  // Build request body, only include response_format if provided
+  const requestBody: Record<string, unknown> = {
+    model: params.model,
+    messages: params.messages,
+    temperature: params.temperature ?? 0.7,
+    max_tokens: params.max_tokens ?? 1024,
+  }
+
+  if (params.response_format) {
+    requestBody.response_format = params.response_format
+  }
+
+  const response = await fetch(`${config.url}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${VERCEL_AI_GATEWAY_TOKEN}`,
+      Authorization: `Bearer ${config.key}`,
     },
-    body: JSON.stringify({
-      model: params.model,
-      messages: params.messages,
-      temperature: params.temperature ?? 0.7,
-      max_tokens: params.max_tokens ?? 1024,
-      response_format: params.response_format,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -55,10 +67,19 @@ export async function completeWithGateway(params: CompletionParams): Promise<Com
 }
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // OpenAI models
   'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
   'gpt-4o': { input: 0.0025, output: 0.01 },
+  'openai/gpt-5.2-codex': { input: 0.003, output: 0.012 },
+
+  // Anthropic models
   'claude-3-haiku': { input: 0.00025, output: 0.00125 },
   'claude-3-sonnet': { input: 0.003, output: 0.015 },
+
+  // AI Gateway models
+  'moonshotai/kimi-k2.5': { input: 0.0005, output: 0.002 },
+  'xai/grok-4.1-fast-reasoning': { input: 0.001, output: 0.004 },
+  'deepseek/deepseek-v3.2-thinking': { input: 0.0003, output: 0.001 },
 }
 
 export function calculateCost(

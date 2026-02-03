@@ -1,8 +1,7 @@
 'use node'
 
-import { v } from 'convex/values'
 import { api } from './_generated/api'
-import { action, mutation, query } from './_generated/server'
+import { action } from './_generated/server'
 
 // StockTwits API response types
 interface StockTwitsSymbol {
@@ -64,50 +63,6 @@ function analyzeSentiment(messages: StockTwitsMessage[]) {
   }
 }
 
-// Query: Get top signals
-export const getTop = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 20
-    return await ctx.db.query('signals').order('desc').take(limit)
-  },
-})
-
-// Query: Get crypto signals
-export const getCrypto = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 20
-    // Filter crypto signals after fetching since we can't query by optional field
-    const allSignals = await ctx.db
-      .query('signals')
-      .order('desc')
-      .take(limit * 2)
-    return allSignals.filter((s) => s.isCrypto === true).slice(0, limit)
-  },
-})
-
-// Mutation: Create a signal
-export const create = mutation({
-  args: {
-    symbol: v.string(),
-    source: v.string(),
-    sentiment: v.number(),
-    volume: v.number(),
-    reason: v.optional(v.string()),
-    bullish: v.optional(v.number()),
-    bearish: v.optional(v.number()),
-    score: v.optional(v.number()),
-    isCrypto: v.optional(v.boolean()),
-    momentum: v.optional(v.number()),
-    price: v.optional(v.number()),
-    timestamp: v.number(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert('signals', args)
-  },
-})
-
 // StockTwits signal gathering - ported from agent-v1.mjs
 export const gatherSignals = action({
   args: {},
@@ -120,7 +75,7 @@ export const gatherSignals = action({
       const sentiment = analyzeSentiment(messages)
 
       if (sentiment.total >= 5) {
-        await ctx.runMutation(api.signals.create, {
+        await ctx.runMutation(api.signalsQueries.create, {
           symbol: sym.symbol,
           source: 'stocktwits',
           sentiment: sentiment.score,

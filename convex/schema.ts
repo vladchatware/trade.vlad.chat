@@ -137,6 +137,7 @@ export default defineSchema({
     bullish: v.optional(v.number()),
     bearish: v.optional(v.number()),
     score: v.optional(v.number()),
+    upvotes: v.optional(v.number()),
     isCrypto: v.optional(v.boolean()),
     momentum: v.optional(v.number()),
     price: v.optional(v.number()),
