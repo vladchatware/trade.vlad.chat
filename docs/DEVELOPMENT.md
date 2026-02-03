@@ -1,63 +1,45 @@
 # Development
 
-## Local Services
-
-You will typically run three services:
-
-1. Cloudflare MCP server (Wrangler)
-2. Agent worker (Bun)
-3. Optional UI (Next + Convex and/or dashboard)
-
 ## Prereqs
 
 - Node.js 18+
 - Bun 1.1+
-- Wrangler (via `npx wrangler`)
 
-## Environment Files
+## Setup
 
-- `.env.local` — Next/Convex and local developer settings
-- `.dev.vars` — secrets for Wrangler/Agent
+1. Install deps:
 
-Recommended `.dev.vars` keys:
-
-```
-ALPACA_API_KEY=...
-ALPACA_API_SECRET=...
-ALPACA_PAPER=true
-AI_GATEWAY_API_KEY=...
-AI_GATEWAY_URL=...
-KILL_SWITCH_SECRET=...
+```bash
+bun install
 ```
 
-## D1 Migrations (local)
+2. Create env files:
+- `.env.local`
+- `.dev.vars`
 
-```
-npx wrangler d1 migrations apply mahoraga-db --local
-```
+3. Start the main stack:
 
-## Start MCP Server
-
-```
-npx wrangler dev --config wrangler.toml
+```bash
+bun run dev
 ```
 
-MCP is available at `http://localhost:8787/mcp`.
+This runs Convex, Next.js, and worker together.
 
-## Start Agent
+## Worker MCP dependency
 
-```
-AGENT_PORT=3010 MCP_URL=http://localhost:8787/mcp bun run worker/index.ts
-```
+The worker expects `MCP_URL` (default `http://localhost:8787/mcp`).
 
-## Optional UI
+If using the in-repo MCP server, start it separately:
 
-```
-npm run dev
+```bash
+bunx wrangler dev --config wrangler.toml
 ```
 
-## Troubleshooting
+## Helpful Commands
 
-- `D1_ERROR: no such table` → run local migrations.
-- `Failed to connect MCP` → ensure Wrangler server is running.
-- `port in use` → set `AGENT_PORT` or stop the existing process.
+- `bun run next:dev`
+- `bun run convex:dev`
+- `bun run worker/index.ts`
+- `bun run test`
+- `bun run typecheck`
+- `bun run lint`
