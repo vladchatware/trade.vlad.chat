@@ -53,8 +53,14 @@ const mocks = vi.hoisted(() => {
     }),
     syncClock: vi.fn().mockResolvedValue(undefined),
     syncSignals: vi.fn().mockResolvedValue(undefined),
+    syncTechnicals: vi.fn().mockResolvedValue(undefined),
+    convexAction: vi.fn().mockResolvedValue({ status: 'success' }),
     getBrokerSnapshot: vi.fn(),
     gatherSignals: vi.fn(),
+    gatherCryptoSignals: vi.fn(),
+    gatherTechnicals: vi.fn(),
+    buildStrategySignals: vi.fn(),
+    ensureCryptoStream: vi.fn(),
   }
 })
 
@@ -68,15 +74,20 @@ vi.mock('./config', () => ({
 }))
 
 vi.mock('./convex-sync', () => ({
-  createConvexClient: vi.fn(() => ({ mutation: vi.fn() })),
+  createConvexClient: vi.fn(() => ({ mutation: vi.fn(), action: mocks.convexAction })),
   syncAccountStateToConvex: mocks.syncAccount,
   syncMarketClockToConvex: mocks.syncClock,
   syncSignalsToConvex: mocks.syncSignals,
+  syncTechnicalIndicatorsToConvex: mocks.syncTechnicals,
 }))
 
 vi.mock('./data-sources', () => ({
+  ensureCryptoMarketStream: mocks.ensureCryptoStream,
   getBrokerSnapshot: mocks.getBrokerSnapshot,
   gatherStocktwitsSignals: mocks.gatherSignals,
+  gatherCryptoMomentumSignals: mocks.gatherCryptoSignals,
+  gatherTechnicalSnapshots: mocks.gatherTechnicals,
+  buildSimpleStrategySignals: mocks.buildStrategySignals,
 }))
 
 import { createActivityLogger } from './logger'
@@ -93,6 +104,9 @@ describe('createOrchestrator (ingest/sync)', () => {
       clock: mocks.clock,
     })
     mocks.gatherSignals.mockResolvedValue(mocks.signals)
+    mocks.gatherCryptoSignals.mockResolvedValue([])
+    mocks.gatherTechnicals.mockResolvedValue([])
+    mocks.buildStrategySignals.mockReturnValue([])
     process.env.CONVEX_URL = 'https://demo.convex.cloud'
   })
 
@@ -120,6 +134,51 @@ describe('createOrchestrator (ingest/sync)', () => {
       },
     ]
     mocks.gatherSignals.mockResolvedValue(mocks.signals)
+    mocks.gatherCryptoSignals.mockResolvedValue([
+      {
+        symbol: 'BTC/USD',
+        source: 'crypto_momentum',
+        sentiment: 0.3,
+        volume: 10,
+        bullish: 1,
+        bearish: 0,
+        reason: 'Momentum +3.00%',
+        isCrypto: true,
+        momentum: 3,
+        price: 60000,
+      },
+    ])
+    mocks.gatherTechnicals.mockResolvedValue([
+      {
+        symbol: 'BTC/USD',
+        market: 'crypto',
+        timeframe: 'realtime',
+        source: 'worker',
+        price: 60000,
+        momentumPct: 3,
+        volume: 10,
+        sma20: 59000,
+        sma50: 58000,
+        ema12: 59500,
+        ema26: 58500,
+        rsi14: 32,
+        timestamp: Date.now(),
+      },
+    ])
+    mocks.buildStrategySignals.mockReturnValue([
+      {
+        symbol: 'BTC/USD',
+        source: 'worker_simple_strategy',
+        sentiment: 0.6,
+        volume: 10,
+        bullish: 1,
+        bearish: 0,
+        reason: 'Bullish setup',
+        isCrypto: true,
+        momentum: 3,
+        price: 60000,
+      },
+    ])
 
     await orchestrator.runSyncCycle()
 
@@ -127,17 +186,27 @@ describe('createOrchestrator (ingest/sync)', () => {
     expect(mocks.syncClock).toHaveBeenCalledTimes(1)
     expect(mocks.syncSignals).toHaveBeenCalledWith(
       expect.objectContaining({
-        signals: mocks.signals,
+        signals: expect.arrayContaining([
+          ...mocks.signals,
+          expect.objectContaining({ symbol: 'BTC/USD', isCrypto: true }),
+          expect.objectContaining({ source: 'worker_simple_strategy' }),
+        ]),
+      })
+    )
+    expect(mocks.syncTechnicals).toHaveBeenCalledWith(
+      expect.objectContaining({
+        snapshots: expect.arrayContaining([expect.objectContaining({ symbol: 'BTC/USD' })]),
       })
     )
 
     const status = orchestrator.getStatus()
-    expect(status.signals).toEqual(mocks.signals)
+    expect(status.signals).toHaveLength(3)
     expect(mocks.logger.log).toHaveBeenCalledWith('SyncWorker', 'sync_ok', {
       positionsSynced: 0,
       snapshotCreated: true,
       accountSynced: true,
-      signalsSynced: 1,
+      signalsSynced: 3,
+      technicalsSynced: 1,
     })
   })
 

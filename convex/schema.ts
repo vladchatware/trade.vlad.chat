@@ -120,6 +120,25 @@ export default defineSchema({
     .index('by_timestamp', ['timestamp'])
     .index('by_symbol', ['symbol']),
 
+  technicalIndicators: defineTable({
+    symbol: v.string(),
+    market: v.union(v.literal('equity'), v.literal('crypto')),
+    timeframe: v.string(),
+    source: v.literal('worker'),
+    price: v.number(),
+    momentumPct: v.number(),
+    volume: v.number(),
+    sma20: v.optional(v.number()),
+    sma50: v.optional(v.number()),
+    ema12: v.optional(v.number()),
+    ema26: v.optional(v.number()),
+    rsi14: v.optional(v.number()),
+    timestamp: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_symbol_market_timeframe', ['symbol', 'market', 'timeframe'])
+    .index('by_timestamp', ['timestamp']),
+
   signalResearch: defineTable({
     symbol: v.string(),
     verdict: v.union(v.literal('BUY'), v.literal('SKIP'), v.literal('WAIT')),

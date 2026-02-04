@@ -1,6 +1,4 @@
-import fs from 'node:fs'
 import http from 'node:http'
-import path from 'node:path'
 import { saveConfig } from './config'
 import type { Orchestrator } from './orchestrator'
 import { getErrorMessage } from './utils'
@@ -65,72 +63,6 @@ export function startDashboardAPI(orchestrator: Orchestrator) {
       } else if (url.pathname === '/api/costs') {
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ ok: true, data: orchestrator.logger.getCosts() }))
-      } else if (url.pathname === '/api/setup/status') {
-        const hasAlpaca = !!(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET)
-        const hasOpenAI = !!process.env.OPENAI_API_KEY
-        const hasGateway = !!(process.env.AI_GATEWAY_API_KEY && process.env.AI_GATEWAY_URL)
-        const startingEquity = orchestrator.config.starting_equity || 100000
-
-        res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(
-          JSON.stringify({
-            ok: true,
-            data: {
-              configured: hasAlpaca,
-              has_alpaca: hasAlpaca,
-              has_openai: hasOpenAI,
-              has_ai_gateway: hasGateway,
-              starting_equity: startingEquity,
-              paper_mode: process.env.ALPACA_PAPER === 'true',
-            },
-          })
-        )
-      } else if (url.pathname === '/api/setup/keys' && req.method === 'POST') {
-        let body = ''
-        req.on('data', (chunk) => {
-          body += chunk
-        })
-        req.on('end', () => {
-          try {
-            const {
-              alpaca_key,
-              alpaca_secret,
-              openai_key,
-              ai_gateway_key,
-              ai_gateway_url,
-              paper_mode,
-              starting_equity,
-            } = JSON.parse(body)
-
-            let envContent = ''
-            if (alpaca_key) envContent += `ALPACA_API_KEY=${alpaca_key}\n`
-            if (alpaca_secret) envContent += `ALPACA_API_SECRET=${alpaca_secret}\n`
-            envContent += `ALPACA_PAPER=${paper_mode !== false ? 'true' : 'false'}\n`
-            if (openai_key) envContent += `OPENAI_API_KEY=${openai_key}\n`
-            if (ai_gateway_key) envContent += `AI_GATEWAY_API_KEY=${ai_gateway_key}\n`
-            if (ai_gateway_url) envContent += `AI_GATEWAY_URL=${ai_gateway_url}\n`
-            envContent += `KILL_SWITCH_SECRET=mahoraga_kill_${Date.now()}\n`
-
-            const envPath = path.join(process.cwd(), '.env.local')
-            fs.writeFileSync(envPath, envContent)
-
-            if (starting_equity) {
-              orchestrator.config.starting_equity = starting_equity
-              saveConfig(orchestrator.config)
-            }
-
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(
-              JSON.stringify({
-                ok: true,
-                message: 'Configuration saved. Please restart the agent.',
-              })
-            )
-          } catch (e) {
-            res.writeHead(400, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ ok: false, error: getErrorMessage(e) }))
-          }
-        })
       } else {
         res.writeHead(404, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ ok: false, error: 'Not found' }))

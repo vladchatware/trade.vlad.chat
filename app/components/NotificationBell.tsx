@@ -32,9 +32,14 @@ interface PremarketPlan {
 interface NotificationBellProps {
   overnightActivity?: OvernightActivity | null
   premarketPlan?: PremarketPlan | null
+  goodSignalCount?: number
 }
 
-export function NotificationBell({ overnightActivity, premarketPlan }: NotificationBellProps) {
+export function NotificationBell({
+  overnightActivity,
+  premarketPlan,
+  goodSignalCount,
+}: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [hasRead, setHasRead] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -46,9 +51,7 @@ export function NotificationBell({ overnightActivity, premarketPlan }: Notificat
       overnightActivity.buySignals > 0)
 
   const unreadCount =
-    hasActivity && !hasRead
-      ? (overnightActivity?.buySignals || 0) + (premarketPlan?.highConvictionPlays?.length || 0)
-      : 0
+    hasActivity && !hasRead ? (goodSignalCount ?? overnightActivity?.buySignals ?? 0) : 0
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

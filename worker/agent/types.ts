@@ -37,6 +37,22 @@ export type Signal = {
   price?: number
 }
 
+export type TechnicalSnapshot = {
+  symbol: string
+  market: 'equity' | 'crypto'
+  timeframe: string
+  source: 'worker'
+  price: number
+  momentumPct: number
+  volume: number
+  sma20: number | null
+  sma50: number | null
+  ema12: number | null
+  ema26: number | null
+  rsi14: number | null
+  timestamp: number
+}
+
 export type Position = {
   symbol: string
   qty?: string | number

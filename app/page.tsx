@@ -6,8 +6,9 @@ import { useClock } from '@/hooks/useClock'
 import { usePortfolio } from '@/hooks/usePortfolio'
 import { usePortfolioHistory } from '@/hooks/usePortfolioHistory'
 import { useMutation, useQuery } from 'convex/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { isGoodSignalResearch } from './dashboard/researchFilters'
 import { FooterBar } from './dashboard/sections/FooterBar'
 import { HeaderBar } from './dashboard/sections/HeaderBar'
 import {
@@ -59,6 +60,9 @@ export default function Dashboard() {
     },
     {} as Record<string, SignalResearch>
   )
+  const goodSignalCount = Object.values(signalResearch).filter((item) =>
+    isGoodSignalResearch(item)
+  ).length
   const config: Config = dbStatus?.config || defaultConfig
 
   const portfolioValue = portfolio.portfolioValue ?? 0
@@ -73,6 +77,24 @@ export default function Dashboard() {
   const llmStats = dbStatus?.llmStats || { totalUsd: 0, calls: 0, tokensIn: 0, tokensOut: 0 }
 
   const { positionPriceHistories, normalizedPositionSeries } = usePositionSeries(positions)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      document.documentElement.setAttribute('data-theme', 'dark')
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = (matchesDark: boolean) => {
+      document.documentElement.setAttribute('data-theme', matchesDark ? 'dark' : 'light')
+    }
+
+    applyTheme(mediaQuery.matches)
+    const handleThemeChange = (event: MediaQueryListEvent) => applyTheme(event.matches)
+    mediaQuery.addEventListener('change', handleThemeChange)
+
+    return () => mediaQuery.removeEventListener('change', handleThemeChange)
+  }, [])
 
   if (dbStatus === undefined || portfolio.isLoading) {
     return (
@@ -104,6 +126,7 @@ export default function Dashboard() {
           time={time}
           overnightActivity={dbStatus?.overnightActivity}
           premarketPlan={dbStatus?.premarketPlan}
+          goodSignalCount={goodSignalCount}
           onOpenSettings={() => setShowSettings(true)}
         />
 

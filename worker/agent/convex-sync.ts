@@ -1,8 +1,9 @@
 import { ConvexHttpClient } from 'convex/browser'
-import type { Position, Signal } from './types'
+import type { Position, Signal, TechnicalSnapshot } from './types'
 
-type ConvexClientLike = {
+type ConvexClient = {
   mutation: (...args: unknown[]) => Promise<unknown>
+  action: (...args: unknown[]) => Promise<unknown>
 }
 
 type AccountLike = {
@@ -27,9 +28,10 @@ const POSITION_HISTORY_MUTATION = 'portfolio/positionHistory:upsert'
 const POSITIONS_CLEANUP_MUTATION = 'portfolio/positions:cleanupClosed'
 const MARKET_CLOCK_UPSERT_MUTATION = 'portfolio/marketClock:upsert'
 const SIGNAL_CREATE_MUTATION = 'signals/queries:create'
+const TECHNICAL_INDICATOR_UPSERT_MUTATION = 'signals/technicalIndicators:upsertFromWorker'
 
-export function createConvexClient(url: string): ConvexClientLike {
-  return new ConvexHttpClient(url) as unknown as ConvexClientLike
+export function createConvexClient(url: string): ConvexClient {
+  return new ConvexHttpClient(url) as unknown as ConvexClient
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -66,7 +68,7 @@ export async function syncAccountStateToConvex({
   startingEquity,
   now = Date.now(),
 }: {
-  convex: ConvexClientLike
+  convex: ConvexClient
   account: unknown
   positions: Position[]
   startingEquity: number
@@ -118,7 +120,7 @@ export async function syncMarketClockToConvex({
   clock,
   now = Date.now(),
 }: {
-  convex: ConvexClientLike
+  convex: ConvexClient
   clock: { is_open?: boolean; next_open?: string; next_close?: string; timestamp?: string } | null
   now?: number
 }) {
@@ -137,7 +139,7 @@ export async function syncSignalsToConvex({
   signals,
   now = Date.now(),
 }: {
-  convex: ConvexClientLike
+  convex: ConvexClient
   signals: Signal[]
   now?: number
 }) {
@@ -155,6 +157,34 @@ export async function syncSignalsToConvex({
         momentum: signal.momentum,
         price: signal.price,
         timestamp: now,
+      })
+    )
+  )
+}
+
+export async function syncTechnicalIndicatorsToConvex({
+  convex,
+  snapshots,
+}: {
+  convex: ConvexClient
+  snapshots: TechnicalSnapshot[]
+}) {
+  await Promise.all(
+    snapshots.map((snapshot) =>
+      convex.mutation(TECHNICAL_INDICATOR_UPSERT_MUTATION, {
+        symbol: snapshot.symbol,
+        market: snapshot.market,
+        timeframe: snapshot.timeframe,
+        source: snapshot.source,
+        price: snapshot.price,
+        momentumPct: snapshot.momentumPct,
+        volume: snapshot.volume,
+        sma20: snapshot.sma20 ?? undefined,
+        sma50: snapshot.sma50 ?? undefined,
+        ema12: snapshot.ema12 ?? undefined,
+        ema26: snapshot.ema26 ?? undefined,
+        rsi14: snapshot.rsi14 ?? undefined,
+        timestamp: snapshot.timestamp,
       })
     )
   )

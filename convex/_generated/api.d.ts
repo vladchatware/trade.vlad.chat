@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agents_index from "../agents/index.js";
 import type * as crons from "../crons.js";
 import type * as portfolio_account from "../portfolio/account.js";
 import type * as portfolio_marketClock from "../portfolio/marketClock.js";
@@ -27,6 +28,7 @@ import type * as signals_researchCycle from "../signals/researchCycle.js";
 import type * as signals_researchStore from "../signals/researchStore.js";
 import type * as signals_scraper from "../signals/scraper.js";
 import type * as signals_secEdgar from "../signals/secEdgar.js";
+import type * as signals_technicalIndicators from "../signals/technicalIndicators.js";
 import type * as signals_technicals from "../signals/technicals.js";
 import type * as system_activityLogs from "../system/activityLogs.js";
 import type * as system_agent from "../system/agent.js";
@@ -50,6 +52,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "agents/index": typeof agents_index;
   crons: typeof crons;
   "portfolio/account": typeof portfolio_account;
   "portfolio/marketClock": typeof portfolio_marketClock;
@@ -69,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   "signals/researchStore": typeof signals_researchStore;
   "signals/scraper": typeof signals_scraper;
   "signals/secEdgar": typeof signals_secEdgar;
+  "signals/technicalIndicators": typeof signals_technicalIndicators;
   "signals/technicals": typeof signals_technicals;
   "system/activityLogs": typeof system_activityLogs;
   "system/agent": typeof system_agent;

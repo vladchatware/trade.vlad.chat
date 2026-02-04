@@ -9,6 +9,7 @@ interface HeaderBarProps {
   time: Date | null
   overnightActivity?: OvernightActivity | null
   premarketPlan?: PremarketPlan | null
+  goodSignalCount?: number
   onOpenSettings: () => void
 }
 
@@ -18,6 +19,7 @@ export function HeaderBar({
   time,
   overnightActivity,
   premarketPlan,
+  goodSignalCount,
   onOpenSettings,
 }: HeaderBarProps) {
   return (
@@ -46,7 +48,11 @@ export function HeaderBar({
             { label: 'API CALLS', value: llmStats.calls.toString() },
           ]}
         />
-        <NotificationBell overnightActivity={overnightActivity} premarketPlan={premarketPlan} />
+        <NotificationBell
+          overnightActivity={overnightActivity}
+          premarketPlan={premarketPlan}
+          goodSignalCount={goodSignalCount}
+        />
         <button
           type="button"
           className="hud-label hover:text-hud-primary transition-colors cursor-pointer"

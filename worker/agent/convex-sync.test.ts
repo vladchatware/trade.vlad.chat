@@ -4,6 +4,7 @@ import {
   syncAccountStateToConvex,
   syncMarketClockToConvex,
   syncSignalsToConvex,
+  syncTechnicalIndicatorsToConvex,
   toConvexAccountPayload,
   toConvexPositionPayload,
 } from './convex-sync'
@@ -50,7 +51,8 @@ describe('convex-sync', () => {
 
   it('writes account, positions, history, cleanup, and portfolio snapshot', async () => {
     const mutation = vi.fn().mockResolvedValue(undefined)
-    const convex = { mutation }
+    const action = vi.fn().mockResolvedValue(undefined)
+    const convex = { mutation, action }
 
     await syncAccountStateToConvex({
       convex,
@@ -108,7 +110,8 @@ describe('convex-sync', () => {
 
   it('writes market clock snapshot', async () => {
     const mutation = vi.fn().mockResolvedValue(undefined)
-    const convex = { mutation }
+    const action = vi.fn().mockResolvedValue(undefined)
+    const convex = { mutation, action }
 
     await syncMarketClockToConvex({
       convex,
@@ -130,7 +133,8 @@ describe('convex-sync', () => {
 
   it('writes stocktwits signals', async () => {
     const mutation = vi.fn().mockResolvedValue(undefined)
-    const convex = { mutation }
+    const action = vi.fn().mockResolvedValue(undefined)
+    const convex = { mutation, action }
 
     await syncSignalsToConvex({
       convex,
@@ -159,6 +163,49 @@ describe('convex-sync', () => {
       isCrypto: undefined,
       momentum: undefined,
       price: undefined,
+      timestamp: 1700000000000,
+    })
+  })
+
+  it('writes technical indicator snapshots', async () => {
+    const mutation = vi.fn().mockResolvedValue(undefined)
+    const action = vi.fn().mockResolvedValue(undefined)
+    const convex = { mutation, action }
+
+    await syncTechnicalIndicatorsToConvex({
+      convex,
+      snapshots: [
+        {
+          symbol: 'BTC/USD',
+          market: 'crypto',
+          timeframe: 'realtime',
+          source: 'worker',
+          price: 60000,
+          momentumPct: 1.23,
+          volume: 250,
+          sma20: 59800,
+          sma50: 59000,
+          ema12: 59900,
+          ema26: 59500,
+          rsi14: 42,
+          timestamp: 1700000000000,
+        },
+      ],
+    })
+
+    expect(mutation).toHaveBeenCalledWith('signals/technicalIndicators:upsertFromWorker', {
+      symbol: 'BTC/USD',
+      market: 'crypto',
+      timeframe: 'realtime',
+      source: 'worker',
+      price: 60000,
+      momentumPct: 1.23,
+      volume: 250,
+      sma20: 59800,
+      sma50: 59000,
+      ema12: 59900,
+      ema26: 59500,
+      rsi14: 42,
       timestamp: 1700000000000,
     })
   })

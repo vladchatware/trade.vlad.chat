@@ -49,7 +49,21 @@
     font-size: 10px;
     background-color: var(--color-hud-bg);
     color: var(--color-hud-text);
+    color-scheme: dark;
     letter-spacing: 0.05em;
+  }
+
+  html[data-theme="light"] {
+    --color-hud-bg: #f6f8fa;
+    --color-hud-bg-panel: #ffffff;
+    --color-hud-primary: #1f5f7a;
+    --color-hud-dim: #8fa3af;
+    --color-hud-line: rgba(31, 95, 122, 0.2);
+    --color-hud-border: rgba(31, 95, 122, 0.3);
+    --color-hud-text: #26414d;
+    --color-hud-text-dim: #5d7480;
+    --color-hud-text-bright: #11242e;
+    color-scheme: light;
   }
 
   body {

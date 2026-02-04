@@ -4,8 +4,16 @@ import {
   syncAccountStateToConvex,
   syncMarketClockToConvex,
   syncSignalsToConvex,
+  syncTechnicalIndicatorsToConvex,
 } from './convex-sync'
-import { gatherStocktwitsSignals, getBrokerSnapshot } from './data-sources'
+import {
+  buildSimpleStrategySignals,
+  ensureCryptoMarketStream,
+  gatherCryptoMomentumSignals,
+  gatherStocktwitsSignals,
+  gatherTechnicalSnapshots,
+  getBrokerSnapshot,
+} from './data-sources'
 import { type ActivityLogger, createActivityLogger } from './logger'
 import type { Config, Costs, LogEntry, Position, Signal } from './types'
 import { getErrorMessage } from './utils'
@@ -17,6 +25,20 @@ export type SyncStatus = {
   positionsSynced: number
   snapshotCreated: boolean
   accountSynced: boolean
+}
+
+export type AnalystStatus = {
+  lastRun: number
+  lastOk: boolean
+  lastError: string | null
+  inFlight: boolean
+}
+
+export type CryptoCycleStatus = {
+  lastRun: number
+  lastOk: boolean
+  lastError: string | null
+  inFlight: boolean
 }
 
 export type Orchestrator = {
@@ -42,6 +64,8 @@ export type Orchestrator = {
     positionTracking: Record<string, never>
     optionsEnabled: boolean
     sync: SyncStatus
+    analyst: AnalystStatus
+    cryptoCycle: CryptoCycleStatus
   }
 }
 
@@ -57,6 +81,7 @@ export function createOrchestrator(): Orchestrator {
   const convexUrl = getConvexUrl()
   const convex = convexUrl ? createConvexClient(convexUrl) : null
   let signalCache: Signal[] = []
+  let technicalSnapshotCount = 0
 
   let syncStatus: SyncStatus = {
     lastSyncRun: 0,
@@ -66,8 +91,21 @@ export function createOrchestrator(): Orchestrator {
     snapshotCreated: false,
     accountSynced: false,
   }
+  let analystStatus: AnalystStatus = {
+    lastRun: 0,
+    lastOk: false,
+    lastError: null,
+    inFlight: false,
+  }
+  let cryptoCycleStatus: CryptoCycleStatus = {
+    lastRun: 0,
+    lastOk: false,
+    lastError: null,
+    inFlight: false,
+  }
 
   async function connect() {
+    ensureCryptoMarketStream(config.crypto_symbols || [])
     return true
   }
 
@@ -98,7 +136,18 @@ export function createOrchestrator(): Orchestrator {
 
     try {
       const { account, positions, clock } = await getAccountState()
-      signalCache = await gatherStocktwitsSignals(config)
+      const [equitySignals, cryptoSignals] = await Promise.all([
+        gatherStocktwitsSignals(config),
+        gatherCryptoMomentumSignals(config),
+      ])
+      const baseSignals = [...equitySignals, ...cryptoSignals]
+      const technicalSnapshots = await gatherTechnicalSnapshots(
+        config,
+        baseSignals.map((signal) => signal.symbol)
+      )
+      technicalSnapshotCount = technicalSnapshots.length
+      const strategySignals = buildSimpleStrategySignals(technicalSnapshots)
+      signalCache = [...baseSignals, ...strategySignals]
 
       const result = await syncAccountStateToConvex({
         convex,
@@ -109,6 +158,10 @@ export function createOrchestrator(): Orchestrator {
       })
       await syncMarketClockToConvex({ convex, clock, now: startedAt })
       await syncSignalsToConvex({ convex, signals: signalCache, now: startedAt })
+      await syncTechnicalIndicatorsToConvex({
+        convex,
+        snapshots: technicalSnapshots,
+      })
 
       syncStatus = {
         lastSyncRun: startedAt,
@@ -124,6 +177,7 @@ export function createOrchestrator(): Orchestrator {
         snapshotCreated: result.snapshotCreated,
         accountSynced: result.accountSynced,
         signalsSynced: signalCache.length,
+        technicalsSynced: technicalSnapshotCount,
       })
     } catch (err) {
       syncStatus = {
@@ -138,6 +192,92 @@ export function createOrchestrator(): Orchestrator {
       logger.log('SyncWorker', 'sync_failed', {
         error: syncStatus.lastSyncError,
       })
+      technicalSnapshotCount = 0
+    }
+  }
+
+  async function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs)
+        }),
+      ])
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }
+
+  async function runTradingDecisionCycle(trigger: 'startup' | 'interval') {
+    if (!convex) return
+    if (analystStatus.inFlight) return
+
+    analystStatus = { ...analystStatus, inFlight: true }
+    const startedAt = Date.now()
+
+    try {
+      const tradingAgentResult = await withTimeout(
+        convex.action('system/agent:runCycle', {}),
+        'trading_agent_cycle',
+        30_000
+      )
+
+      analystStatus = {
+        lastRun: startedAt,
+        lastOk: true,
+        lastError: null,
+        inFlight: false,
+      }
+
+      logger.log('AnalystWorker', 'analyst_cycle_ok', {
+        trigger,
+        tradingAgentResult,
+      })
+    } catch (err) {
+      const error = getErrorMessage(err)
+      analystStatus = {
+        lastRun: startedAt,
+        lastOk: false,
+        lastError: error,
+        inFlight: false,
+      }
+      logger.log('AnalystWorker', 'analyst_cycle_failed', { trigger, error })
+    }
+  }
+
+  async function runCryptoExecutionCycle(trigger: 'startup' | 'interval') {
+    if (!convex) return
+    if (cryptoCycleStatus.inFlight) return
+
+    cryptoCycleStatus = { ...cryptoCycleStatus, inFlight: true }
+    const startedAt = Date.now()
+
+    try {
+      const cryptoResult = await withTimeout(
+        convex.action('trading/cryptoAgent:runCryptoTrading', {}),
+        'crypto_cycle',
+        10_000
+      )
+
+      cryptoCycleStatus = {
+        lastRun: startedAt,
+        lastOk: true,
+        lastError: null,
+        inFlight: false,
+      }
+
+      logger.log('CryptoWorker', 'crypto_cycle_ok', { trigger, cryptoResult })
+    } catch (err) {
+      const error = getErrorMessage(err)
+      cryptoCycleStatus = {
+        lastRun: startedAt,
+        lastOk: false,
+        lastError: error,
+        inFlight: false,
+      }
+      logger.log('CryptoWorker', 'crypto_cycle_failed', { trigger, error })
     }
   }
 
@@ -150,10 +290,21 @@ export function createOrchestrator(): Orchestrator {
     saveConfig(config)
 
     await runSyncCycle()
+    void runTradingDecisionCycle('startup')
+    void runCryptoExecutionCycle('startup')
 
     setInterval(async () => {
       await runSyncCycle()
     }, config.data_poll_interval_ms)
+
+    setInterval(() => {
+      void runTradingDecisionCycle('interval')
+    }, config.analyst_interval_ms)
+
+    const cryptoLoopIntervalMs = Math.max(5_000, Math.min(config.analyst_interval_ms, 15_000))
+    setInterval(() => {
+      void runCryptoExecutionCycle('interval')
+    }, cryptoLoopIntervalMs)
 
     setInterval(() => {
       logger.save()
@@ -167,13 +318,15 @@ export function createOrchestrator(): Orchestrator {
       signals: signalCache,
       logs: logger.getRecentLogs(100),
       costs: logger.getCosts(),
-      lastAnalystRun: syncStatus.lastSyncRun,
+      lastAnalystRun: analystStatus.lastRun,
       signalResearch: {},
       positionResearch: {},
       stalenessAnalysis: {},
       positionTracking: {},
       optionsEnabled: false,
       sync: syncStatus,
+      analyst: analystStatus,
+      cryptoCycle: cryptoCycleStatus,
     }
   }
 
