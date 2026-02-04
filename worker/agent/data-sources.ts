@@ -178,6 +178,7 @@ async function getSentiment(symbol: string): Promise<Signal | null> {
   const total = messages.length
   if (total === 0) return null
   const score = (bullish - bearish) / total
+  const price = await getLatestStockPrice(symbol)
 
   return {
     symbol,
@@ -187,6 +188,7 @@ async function getSentiment(symbol: string): Promise<Signal | null> {
     bullish,
     bearish,
     reason: `StockTwits: ${bullish}B/${bearish}b (${(score * 100).toFixed(0)}%)`,
+    price,
   }
 }
 
@@ -362,15 +364,23 @@ async function fetchCryptoBars(symbol: string): Promise<AlpacaCryptoBarsResponse
   return null
 }
 
-async function fetchStockBars(symbol: string): Promise<AlpacaStockBarsResponse | null> {
+async function fetchStockBars(symbol: string, limit = 60): Promise<AlpacaStockBarsResponse | null> {
   const headers = alpacaHeaders()
   const encodedSymbol = encodeURIComponent(symbol)
-  const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${encodedSymbol}&timeframe=1Min&limit=60&feed=iex`
+  const url = `https://data.alpaca.markets/v2/stocks/bars?symbols=${encodedSymbol}&timeframe=1Min&limit=${limit}&feed=iex`
   try {
     return await fetchJson<AlpacaStockBarsResponse>(url, { headers })
   } catch {
     return null
   }
+}
+
+async function getLatestStockPrice(symbol: string): Promise<number | undefined> {
+  const barsData = await fetchStockBars(symbol, 1)
+  if (!barsData?.bars) return undefined
+  const bars = barsData.bars[symbol] || Object.values(barsData.bars)[0] || []
+  const lastClose = toNumber(bars[bars.length - 1]?.c)
+  return lastClose > 0 ? lastClose : undefined
 }
 
 export async function gatherCryptoMomentumSignals(config: Config): Promise<Signal[]> {
