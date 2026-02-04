@@ -20,9 +20,12 @@ describe('agent prompt', () => {
 })
 
 describe('thread title', () => {
-  it('uses daily title format', () => {
+  it('uses per-hour title format', () => {
     expect(getTradingCycleThreadTitle(new Date('2026-02-03T12:00:00.000Z'))).toBe(
-      'trading-cycle-2026-02-03'
+      'trading-cycle-2026-02-03T12'
+    )
+    expect(getTradingCycleThreadTitle(new Date('2026-02-03T12:59:59.000Z'))).toBe(
+      'trading-cycle-2026-02-03T12'
     )
   })
 })

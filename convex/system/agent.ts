@@ -43,7 +43,7 @@ ${JSON.stringify(snapshot)}`
 }
 
 export function getTradingCycleThreadTitle(now = new Date()): string {
-  return `trading-cycle-${now.toISOString().slice(0, 10)}`
+  return `trading-cycle-${now.toISOString().slice(0, 13)}`
 }
 
 async function getOrCreateTradingCycleThread(ctx: ActionCtx): Promise<string> {
@@ -57,7 +57,7 @@ async function getOrCreateTradingCycleThread(ctx: ActionCtx): Promise<string> {
 
   return createThread(ctx, components.agent, {
     title,
-    summary: 'Daily thread for scheduled trading cycle decisions.',
+    summary: 'Hourly trading cycle decisions based on account state, positions, signals, and risk.',
   })
 }
 
