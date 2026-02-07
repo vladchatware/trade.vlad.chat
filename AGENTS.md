@@ -96,6 +96,42 @@ Every run must follow this cycle:
   - `test(scope): ...`
   - `docs(scope): ...`
 
+## Self-Hosted Convex Setup
+
+The backend runs locally via Docker (no cloud billing limits).
+
+### Prerequisites
+- Docker Desktop running
+
+### First-Time Setup
+```bash
+# 1. Start Convex backend + dashboard
+bun run convex:up
+
+# 2. Generate admin key (wait for containers to be healthy first)
+docker compose exec backend ./generate_admin_key.sh
+
+# 3. Create .env.local from example and paste the admin key
+cp .env.example .env.local
+# Edit .env.local: set CONVEX_SELF_HOSTED_ADMIN_KEY=<pasted-key>
+# Fill in remaining secrets (Alpaca, AI Gateway, etc.)
+
+# 4. Deploy schema + functions to local backend
+npx convex dev
+
+# 5. Start everything
+bun run dev
+```
+
+### Endpoints
+- Backend API: `http://127.0.0.1:3210`
+- HTTP Actions: `http://127.0.0.1:3211`
+- Dashboard: `http://localhost:6791`
+
+### Data
+- Persisted in Docker named volume `data` (survives container restarts)
+- Reset data: `docker compose down -v && docker compose up -d`
+
 ## Default Validation Checklist
 
 Use the smallest set that proves correctness for the change:
