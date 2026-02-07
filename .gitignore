@@ -69,6 +69,7 @@ dashboard/*.log
 *.sqlite-shm
 .mf/
 .miniflare/
+convex-data/
 
 # -----------------------------------------------------------------------------
 # OS Files
