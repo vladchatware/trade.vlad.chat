@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><body><pre id="log" style="color:#0f0;background:#111;font:12px monospace;padding:20px;min-height:100vh"></pre>
+<script>
+const log = document.getElementById('log')
+function append(text) { log.textContent += text + '\n' }
+
+append('Page loaded from: ' + window.location.href)
+
+try {
+  append('Connecting candle WS...')
+  const cws = new WebSocket('ws://localhost:3001/klines')
+  cws.onopen = () => append('Candle WS OPEN')
+  cws.onmessage = (e) => {
+    const d = JSON.parse(e.data)
+    if (d.type === 'snapshot') append('Snapshot: ' + d.candles.length + ' candles')
+    else if (d.type === 'candle') append('Candle: t=' + d.candle.time + ' c=' + d.candle.close)
+  }
+  cws.onerror = () => append('Candle WS ERROR')
+  cws.onclose = (e) => append('Candle WS CLOSED code=' + e.code)
+} catch(e) { append('Candle WS EXCEPTION: ' + e.message) }
+
+try {
+  append('Connecting signal WS...')
+  const sws = new WebSocket('ws://localhost:3002/signal')
+  sws.onopen = () => append('Signal WS OPEN')
+  sws.onmessage = (e) => {
+    const d = JSON.parse(e.data)
+    if (d.type === 'regime') append('Signal: ' + d.regime + ' score=' + d.alignmentScore)
+  }
+  sws.onerror = () => append('Signal WS ERROR')
+  sws.onclose = (e) => append('Signal WS CLOSED code=' + e.code)
+} catch(e) { append('Signal WS EXCEPTION: ' + e.message) }
+
+append('--- waiting 10s ---')
+setTimeout(() => append('--- done ---'), 10000)
+</script></body></html>
