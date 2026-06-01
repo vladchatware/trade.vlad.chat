@@ -17,9 +17,19 @@ interface SRLine {
   strength: number
 }
 
-const COLORS = {
-  support: '#bc8cff',
-  resistance: '#58a6ff',
+/** Return dynamic color for S/R levels based on market bias.
+ *  Bearish: resistance (trade from) = green, support = red.
+ *  Bullish: support (trade from) = green, resistance = red.
+ */
+function levelColor(type: 'support' | 'resistance', bias: string): string {
+  if (bias === 'bullish') {
+    return type === 'support' ? '#26a69a' : '#ef5350'
+  }
+  if (bias === 'bearish') {
+    return type === 'resistance' ? '#26a69a' : '#ef5350'
+  }
+  // watch-only / sideways — neutral amber
+  return '#ffd166'
 }
 
 export class SRPrimitive implements ISeriesPrimitive<Time> {
@@ -28,9 +38,15 @@ export class SRPrimitive implements ISeriesPrimitive<Time> {
   private _requestUpdate: (() => void) | null = null
   private _levels: SRLevel[] = []
   private _lines: SRLine[] = []
+  private _bias: string = ''
 
   updateData(levels: SRLevel[]): void {
     this._levels = levels
+    this._requestUpdate?.()
+  }
+
+  updateBias(bias: string): void {
+    this._bias = bias
     this._requestUpdate?.()
   }
 
@@ -61,7 +77,7 @@ export class SRPrimitive implements ISeriesPrimitive<Time> {
 
       this._lines.push({
         y,
-        color: lvl.type === 'support' ? COLORS.support : COLORS.resistance,
+        color: levelColor(lvl.type, this._bias),
         label: `${lvl.type === 'support' ? 'S' : 'R'} ${lvl.price.toFixed(0)}`,
         strength: lvl.strength,
       })

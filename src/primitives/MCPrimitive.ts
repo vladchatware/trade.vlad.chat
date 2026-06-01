@@ -12,14 +12,34 @@ import type { MCResult } from '../lib/monteCarlo'
 import type { Candle } from '../types'
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                          */
+/*  Color palettes by bias                                             */
 /* ------------------------------------------------------------------ */
 
-const MC_BAND_FILL = 'rgba(46, 160, 67, 0.18)'     // 25-75 band
-const MC_BAND_LIGHT = 'rgba(26, 83, 37, 0.12)'     // 10-90 band
-const MC_MEDIAN = '#f0883e'                         // median line
-const MC_PATH = 'rgba(88, 166, 255, 0.15)'          // sample paths
-const SEPARATOR = 'rgba(72, 79, 88, 0.4)'           // now line
+interface MCPalette {
+  bandFill: string   // 25-75 band
+  bandLight: string  // 10-90 band
+  median: string     // median line
+}
+
+const PALETTE_BULLISH: MCPalette = {
+  bandFill: 'rgba(46, 160, 67, 0.18)',
+  bandLight: 'rgba(26, 83, 37, 0.12)',
+  median: '#2ea043',
+}
+
+const PALETTE_BEARISH: MCPalette = {
+  bandFill: 'rgba(220, 50, 50, 0.18)',
+  bandLight: 'rgba(150, 30, 30, 0.12)',
+  median: '#dc3232',
+}
+
+const PALETTE_NEUTRAL: MCPalette = {
+  bandFill: 'rgba(255, 209, 102, 0.18)',
+  bandLight: 'rgba(255, 209, 102, 0.10)',
+  median: '#ffd166',
+}
+
+const SEPARATOR = 'rgba(72, 79, 88, 0.4)'           // now line (unchanged)
 
 /* ------------------------------------------------------------------ */
 /*  MCPrimitive                                                        */
@@ -31,10 +51,27 @@ export class MCPrimitive implements ISeriesPrimitive<Time> {
   private _requestUpdate: (() => void) | null = null
   private _mc: MCResult | null = null
   private _candles: Candle[] = []
+  private _palette: MCPalette = PALETTE_NEUTRAL
 
   updateData(mc: MCResult | null, candles: Candle[]): void {
     this._mc = mc
     this._candles = candles
+    this._requestUpdate?.()
+  }
+
+  updateBias(bias: string): void {
+    switch (bias) {
+      case 'long':
+      case 'bullish':
+        this._palette = PALETTE_BULLISH
+        break
+      case 'short':
+      case 'bearish':
+        this._palette = PALETTE_BEARISH
+        break
+      default:
+        this._palette = PALETTE_NEUTRAL
+    }
     this._requestUpdate?.()
   }
 
@@ -116,7 +153,7 @@ export class MCPrimitive implements ISeriesPrimitive<Time> {
                   const w = Math.max(1, x1 - x0)
                   const top = Math.round(Math.min(ys.upper90[s]!, ys.lower10[s]!) * vpr)
                   const bot = Math.round(Math.max(ys.upper90[s]!, ys.lower10[s]!) * vpr)
-                  ctx.fillStyle = MC_BAND_LIGHT
+                  ctx.fillStyle = this._palette.bandLight
                   ctx.fillRect(x0, top, w, Math.max(1, bot - top))
                 }
 
@@ -129,12 +166,12 @@ export class MCPrimitive implements ISeriesPrimitive<Time> {
                   const w = Math.max(1, x1 - x0)
                   const top = Math.round(Math.min(ys.upper75[s]!, ys.lower25[s]!) * vpr)
                   const bot = Math.round(Math.max(ys.upper75[s]!, ys.lower25[s]!) * vpr)
-                  ctx.fillStyle = MC_BAND_FILL
+                  ctx.fillStyle = this._palette.bandFill
                   ctx.fillRect(x0, top, w, Math.max(1, bot - top))
                 }
 
                 // Median line
-                ctx.strokeStyle = MC_MEDIAN
+                ctx.strokeStyle = this._palette.median
                 ctx.lineWidth = Math.max(1, Math.round(1.5 * vpr))
                 ctx.beginPath()
                 let started = false

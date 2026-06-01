@@ -1,4 +1,5 @@
 import type { Regime, MCResult } from '../types'
+import type { ThemeColors } from '../lib/theme'
 
 interface SignalDisplayProps {
   bias: string
@@ -9,6 +10,7 @@ interface SignalDisplayProps {
   alignmentScore: number
   connected: boolean
   mcResult: MCResult | null
+  theme: ThemeColors
 }
 
 const BIAS_COLORS: Record<string, string> = {
@@ -25,7 +27,7 @@ const DIR_COLORS: Record<string, string> = {
   ranging: '#888',
 }
 
-export function SignalDisplay({ bias, regime, rawRegime, session, directions, alignmentScore, connected, mcResult }: SignalDisplayProps) {
+export function SignalDisplay({ bias, regime, rawRegime, session, directions, alignmentScore, connected, mcResult, theme }: SignalDisplayProps) {
   const biasColor = BIAS_COLORS[bias] || '#666'
   const biasLabel = bias === 'watch-only' ? 'WATCH' : (bias || 'WATCH').toUpperCase()
 
@@ -43,7 +45,7 @@ export function SignalDisplay({ bias, regime, rawRegime, session, directions, al
         >
           {biasLabel}
         </span>
-        <span className="text-[10px] text-white/30 font-mono">
+        <span className="text-[10px] font-mono" style={{ color: theme.textMuted }}>
           {session}
         </span>
       </div>
@@ -69,10 +71,10 @@ export function SignalDisplay({ bias, regime, rawRegime, session, directions, al
 
       {/* Raw regime + confidence bar */}
       <div className="flex items-center gap-2">
-        <span className="text-[9px] text-white/25 font-mono uppercase tracking-wider">
+        <span className="text-[9px] font-mono uppercase tracking-wider" style={{ color: theme.textMuted }}>
           {rawRegime}
         </span>
-        <div className="w-12 h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="w-12 h-1 rounded-full overflow-hidden" style={{ backgroundColor: theme.textMuted + '22' }}>
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -81,7 +83,7 @@ export function SignalDisplay({ bias, regime, rawRegime, session, directions, al
             }}
           />
         </div>
-        <span className="text-[9px] text-white/25 font-mono">
+        <span className="text-[9px] font-mono" style={{ color: theme.textMuted }}>
           {Math.round(alignmentScore * 100)}%
         </span>
       </div>
@@ -108,7 +110,7 @@ export function SignalDisplay({ bias, regime, rawRegime, session, directions, al
         <span
           className={`inline-block w-1 h-1 rounded-full ${connected ? 'bg-[#26a69a]' : 'bg-[#ef5350]'}`}
         />
-        <span className="text-[8px] text-white/20 font-mono">
+        <span className="text-[8px] font-mono" style={{ color: theme.textMuted }}>
           {connected ? 'signal live' : 'disconnected'}
         </span>
       </div>

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { TradeRecord } from '../types'
+import type { ThemeColors } from '../lib/theme'
 
 interface TradeHistoryProps {
   trades: TradeRecord[]
+  theme: ThemeColors
 }
 
-export function TradeHistory({ trades }: TradeHistoryProps) {
+export function TradeHistory({ trades, theme }: TradeHistoryProps) {
   const [open, setOpen] = useState(false)
 
   // Merge strategy + PWA trades sorted by closedAt desc
@@ -21,15 +23,25 @@ export function TradeHistory({ trades }: TradeHistoryProps) {
       {/* Toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="text-[10px] text-white/30 hover:text-white/60 tracking-widest uppercase bg-black/60 px-2 py-1 rounded-md transition-colors"
+        className="text-[10px] tracking-widest uppercase px-2 py-1 rounded-md transition-colors font-mono"
+        style={{
+          color: theme.textMuted,
+          backgroundColor: theme.bg + '99',
+        }}
       >
         {open ? '✕ Close' : `📋 ${sorted.length} trades`}
       </button>
 
       {/* History panel */}
       {open && (
-        <div className="absolute bottom-8 left-0 w-[22rem] max-h-72 overflow-y-auto bg-neutral-900/95 backdrop-blur rounded-xl border border-white/5 p-3 space-y-1">
-          <div className="flex items-center justify-between text-[9px] text-white/30 tracking-widest uppercase mb-2">
+        <div
+          className="absolute bottom-8 left-0 w-[22rem] max-h-72 overflow-y-auto backdrop-blur rounded-xl border p-3 space-y-1"
+          style={{
+            backgroundColor: theme.bg + 'f2',
+            borderColor: theme.border,
+          }}
+        >
+          <div className="flex items-center justify-between text-[9px] tracking-widest uppercase mb-2" style={{ color: theme.textMuted }}>
             <span>Trade History</span>
             <span className="space-x-2">
               {pwaCount > 0 && <span className="text-green-500/60">{pwaCount} pwa</span>}

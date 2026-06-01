@@ -4,6 +4,7 @@ import {
   CandlestickSeries,
   LineSeries,
   createSeriesMarkers,
+  createTextWatermark,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
@@ -12,6 +13,7 @@ import {
   type Time,
 } from 'lightweight-charts'
 import type { Candle, KillZone, Position, Regime, SRLevel, MCResult } from '../types'
+import type { ThemeColors } from '../lib/theme'
 import { KillZonePrimitive } from './KillZonePrimitive'
 import { VolumePrimitive } from '../primitives/VolumePrimitive'
 import { SRPrimitive } from '../primitives/SRPrimitive'
@@ -28,36 +30,38 @@ interface ChartProps {
   regime: Regime
   srLevels: SRLevel[]
   mcResult: MCResult | null
-}
-
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const COLORS = {
-  up: '#26a69a',
-  down: '#ef5350',
-  text: '#888',
-  grid: '#1a1a1a',
-  bg: '#0a0a0a',
-  crosshair: '#555',
-  vwap: '#e1e1e1',
-  volumeUp: 'rgba(38, 166, 154, 0.5)',
-  volumeDown: 'rgba(239, 83, 80, 0.5)',
+  bias?: string
+  theme: ThemeColors
 }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function candleToLw(c: Candle): CandlestickData {
-  return {
-    time: (c.time / 1000) as Time,
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
+/** Convert candle array to Heikin Ashi CandlestickData[] */
+function toHeikinAshi(candles: Candle[]): CandlestickData[] {
+  const result: CandlestickData[] = []
+  let prevHaOpen = 0
+  let prevHaClose = 0
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i]
+    const haClose = (c.open + c.high + c.low + c.close) / 4
+    const haOpen = i === 0
+      ? c.open
+      : (prevHaOpen + prevHaClose) / 2
+    const haHigh = Math.max(c.high, haOpen, haClose)
+    const haLow = Math.min(c.low, haOpen, haClose)
+    result.push({
+      time: (c.time / 1000) as Time,
+      open: haOpen,
+      high: haHigh,
+      low: haLow,
+      close: haClose,
+    })
+    prevHaOpen = haOpen
+    prevHaClose = haClose
   }
+  return result
 }
 
 /** Compute VWAP for a rolling window of candles. Returns one value per candle. */
@@ -79,7 +83,7 @@ function computeVWAP(candles: Candle[]): (LineData & { candleTime: number })[] {
 /*  Chart component                                                    */
 /* ------------------------------------------------------------------ */
 
-export function Chart({ candles, killZones, position, regime, srLevels, mcResult }: ChartProps) {
+export function Chart({ candles, killZones, position, regime, srLevels, mcResult, bias, theme }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -98,23 +102,23 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
 
     const chart = createChart(container, {
       layout: {
-        background: { color: COLORS.bg },
-        textColor: COLORS.text,
+        background: { color: theme.bg },
+        textColor: theme.text,
       },
       grid: {
-        vertLines: { color: COLORS.grid },
-        horzLines: { color: COLORS.grid },
+        vertLines: { color: theme.grid },
+        horzLines: { color: theme.grid },
       },
       crosshair: {
         mode: 0,
-        vertLine: { color: COLORS.crosshair, style: 2 as LineStyle, labelBackgroundColor: COLORS.crosshair },
-        horzLine: { color: COLORS.crosshair, style: 2 as LineStyle, labelBackgroundColor: COLORS.crosshair },
+        vertLine: { color: theme.crosshair, style: 2 as LineStyle, labelBackgroundColor: theme.crosshair },
+        horzLine: { color: theme.crosshair, style: 2 as LineStyle, labelBackgroundColor: theme.crosshair },
       },
       rightPriceScale: {
-        borderColor: COLORS.grid,
+        borderColor: theme.border,
       },
       timeScale: {
-        borderColor: COLORS.grid,
+        borderColor: theme.border,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -123,18 +127,18 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
     })
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: COLORS.up,
-      downColor: COLORS.down,
-      borderUpColor: COLORS.up,
-      borderDownColor: COLORS.down,
-      wickUpColor: COLORS.up,
-      wickDownColor: COLORS.down,
+      upColor: theme.up,
+      downColor: theme.down,
+      borderUpColor: theme.up,
+      borderDownColor: theme.down,
+      wickUpColor: theme.up,
+      wickDownColor: theme.down,
       priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
     })
 
     // VWAP overlay on same pane
     const vwapSeries = chart.addSeries(LineSeries, {
-      color: COLORS.vwap,
+      color: theme.text,
       lineWidth: 1,
       lineStyle: 2 as LineStyle, // Dashed
       lastValueVisible: false,
@@ -159,6 +163,7 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
     const srPrimitive = new SRPrimitive()
     candleSeries.attachPrimitive(srPrimitive as any)
     srPrimitive.updateData(srLevels)
+    srPrimitive.updateBias(bias || '')
 
     // Monte Carlo primitive — projection bands
     const mcPrimitive = new MCPrimitive()
@@ -167,6 +172,22 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
 
     // Markers for position entry
     const markers = createSeriesMarkers(candleSeries, [])
+
+    // Brand logo bottom-left
+    createTextWatermark(chart.panes()[0], {
+      visible: true,
+      horzAlign: 'left',
+      vertAlign: 'bottom',
+      lines: [
+        {
+          text: '◆ Flappy Trade',
+          color: theme.textMuted,
+          fontSize: 14,
+          fontFamily: '-apple-system, sans-serif',
+          fontStyle: 'bold',
+        },
+      ],
+    })
 
     chartRef.current = chart
     candleSeriesRef.current = candleSeries
@@ -212,7 +233,7 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
     const prevLogicalRange = chart?.timeScale().getVisibleLogicalRange()
     const prevPriceRange = chart?.priceScale('right').getVisibleRange()
 
-    const data = candles.map(candleToLw).sort((a, b) => Number(a.time) - Number(b.time))
+    const data = toHeikinAshi(candles)
     series.setData(data)
 
     // Restore time scale — stable across data appends
@@ -280,6 +301,12 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
   useEffect(() => {
     srPrimitiveRef.current?.updateData(srLevels)
   }, [srLevels])
+
+  // ---- (5c) S/R bias coloring & MC bias coloring ----
+  useEffect(() => {
+    srPrimitiveRef.current?.updateBias(bias || '')
+    mcPrimitiveRef.current?.updateBias(bias || '')
+  }, [bias])
 
   // ---- (5c) Monte Carlo primitive update ----
   useEffect(() => {
@@ -358,11 +385,46 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
 
     chart.applyOptions({
       layout: {
-        background: { color: COLORS.bg },
-        textColor: COLORS.text,
+        background: { color: theme.bg },
+        textColor: theme.text,
       },
     })
   }, [regime])
+
+  // ---- (8b) Apply theme colors ----
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    chart.applyOptions({
+      layout: {
+        background: { color: theme.bg },
+        textColor: theme.text,
+      },
+      grid: {
+        vertLines: { color: theme.grid },
+        horzLines: { color: theme.grid },
+      },
+      rightPriceScale: {
+        borderColor: theme.border,
+      },
+      timeScale: {
+        borderColor: theme.border,
+      },
+      crosshair: {
+        vertLine: { color: theme.crosshair, labelBackgroundColor: theme.crosshair },
+        horzLine: { color: theme.crosshair, labelBackgroundColor: theme.crosshair },
+      },
+    })
+    candleSeriesRef.current?.applyOptions({
+      upColor: theme.up,
+      downColor: theme.down,
+      borderUpColor: theme.up,
+      borderDownColor: theme.down,
+      wickUpColor: theme.up,
+      wickDownColor: theme.down,
+    })
+    vwapSeriesRef.current?.applyOptions({ color: theme.text })
+  }, [theme])
 
   return (
     <div

@@ -15,9 +15,13 @@ import { useSound } from './hooks/useSound'
 import { useSRLevels } from './hooks/useSRLevels'
 import { useMonteCarlo } from './hooks/useMonteCarlo'
 import { getActiveKillZones } from './lib/killZones'
+import { DARK, LIGHT, type ThemeColors } from './lib/theme'
 import type { KillZone, Regime } from './types'
 
 export default function App() {
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  )
   const [isRunning, setIsRunning] = useState(false)
   const [tf, setTf] = useState<'5m' | '15m'>('5m')
   const signal = useRegimeSignal()
@@ -38,6 +42,14 @@ export default function App() {
       setKillZones(getActiveKillZones())
     }, 60_000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Follow system color scheme
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setThemeMode(e.matches ? 'dark' : 'light')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
   }, [])
 
   // Enrich kill zones with session high/low from candle data
@@ -125,16 +137,24 @@ export default function App() {
     handleTap(candles[candles.length - 1].close, regime)
   }
 
+  const theme = themeMode === 'dark' ? DARK : LIGHT
+
   return (
-    <div className="relative w-full h-dvh bg-black overflow-hidden">
+    <div className={`relative w-full h-dvh overflow-hidden ${themeMode === 'light' ? 'bg-white' : 'bg-black'}`}>
       {/* Balance scoreboard — floats on top of chart */}
       <div className="absolute top-2 left-0 right-0 z-20 flex justify-center pointer-events-none">
         <div className="text-center">
-          <div className="text-2xl font-bold font-mono text-white tracking-tight">
+          <div
+            className="text-2xl font-bold font-mono tracking-tight"
+            style={{ color: themeMode === 'dark' ? '#fff' : '#111' }}
+          >
             ${balance.toFixed(2)}
           </div>
-          <div className="text-[9px] text-white/25 tracking-widest uppercase mt-0.5">
-            Balance · Best ${highScore.toFixed(2)}
+          <div
+            className="text-[9px] tracking-widest uppercase mt-0.5"
+            style={{ color: theme.textMuted }}
+          >
+            Binance · Best ${highScore.toFixed(2)}
           </div>
         </div>
       </div>
@@ -149,12 +169,13 @@ export default function App() {
         alignmentScore={signal.alignmentScore}
         connected={signal.connected}
         mcResult={mcResult}
+        theme={theme}
       />
 
       {/* Chart — full screen, edge to edge */}
       <div className="absolute inset-0">
         <ErrorBoundary>
-          <Chart candles={candles} killZones={killZonesWithHL} position={position} regime={regime} srLevels={filteredSr} mcResult={mcResult} />
+          <Chart candles={candles} killZones={killZonesWithHL} position={position} regime={regime} srLevels={filteredSr} mcResult={mcResult} bias={regime} theme={theme} />
         </ErrorBoundary>
       </div>
 
@@ -166,7 +187,7 @@ export default function App() {
       {/* Position card */}
       {position && !liquidated && (
         <div className="absolute bottom-16 left-4 right-4 z-20">
-          <PositionCard position={position} balance={balance} />
+          <PositionCard position={position} balance={balance} theme={theme} />
         </div>
       )}
 
@@ -176,7 +197,7 @@ export default function App() {
       )}
 
       {/* Trade history toggle — merge PWA + strategy trades */}
-      <TradeHistory trades={[...trades, ...strategyTrades]} />
+      <TradeHistory trades={[...trades, ...strategyTrades]} theme={theme} />
 
       {/* Bottom bar: Start/Pause + controls */}
       <div className="absolute bottom-3 left-4 right-4 z-20 flex flex-col items-center gap-2">
@@ -184,17 +205,23 @@ export default function App() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setTf(tf === '5m' ? '15m' : '5m')}
-            className="px-2 py-0.5 text-[10px] font-mono rounded-full border border-white/10 text-white/30 hover:text-white/60 hover:border-white/30 transition-colors uppercase tracking-wider"
+            className="px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors uppercase tracking-wider"
+            style={{
+              color: theme.textMuted,
+              borderColor: theme.textMuted + '44',
+            }}
           >
             {tf}
           </button>
           <button
             onClick={() => { const v = sound.toggle(); setSoundEnabled(v); }}
             className={`px-2 py-0.5 text-[10px] rounded-full border transition-all ${
-              soundEnabled
-                ? 'border-white/30 text-white/60'
-                : 'border-white/10 text-white/20'
+              soundEnabled ? '' : 'opacity-40'
             }`}
+            style={{
+              color: theme.textMuted,
+              borderColor: theme.textMuted + (soundEnabled ? '66' : '22'),
+            }}
             title={soundEnabled ? 'Mute' : 'Unmute'}
           >
             ♪
@@ -203,6 +230,7 @@ export default function App() {
         <StartPauseButton
           isRunning={isRunning}
           onToggle={() => setIsRunning(r => !r)}
+          theme={theme}
         />
       </div>
     </div>

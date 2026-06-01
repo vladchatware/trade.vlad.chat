@@ -1,11 +1,14 @@
 import type { Position } from '../types'
+import type { ThemeColors } from '../lib/theme'
 
 interface PositionCardProps {
   position: Position
   balance: number
+  theme: ThemeColors
 }
 
-export function PositionCard({ position, balance }: PositionCardProps) {
+export function PositionCard({ position, balance, theme }: PositionCardProps) {
+  const isDark = theme.bg === '#0a0a0a'
   const sideColor = position.side === 'long' ? 'text-green-500' : 'text-red-500'
   const sideBg = position.side === 'long' ? 'bg-green-500/10' : 'bg-red-500/10'
   const sideBorder = position.side === 'long' ? 'border-green-500/20' : 'border-red-500/20'
@@ -13,7 +16,7 @@ export function PositionCard({ position, balance }: PositionCardProps) {
   const pnlBarPct = Math.min(Math.abs(position.unrealizedPnl) / (position.margin * 5) * 100, 100)
 
   return (
-    <div className={`bg-neutral-900/90 backdrop-blur rounded-xl px-4 py-3 border ${sideBorder}`}>
+    <div className={`rounded-xl px-4 py-3 border ${sideBorder}`} style={{ backgroundColor: isDark ? 'rgba(23,23,23,0.9)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)' }}>
       {/* Header row: side badge + PnL */}
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
@@ -42,12 +45,12 @@ export function PositionCard({ position, balance }: PositionCardProps) {
       {/* Price details */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
         <div className="flex justify-between">
-          <span className="text-white/30">Entry</span>
-          <span className="text-white/70">${position.entryPrice.toFixed(1)}</span>
+          <span style={{ color: theme.textMuted }}>Entry</span>
+          <span style={{ color: theme.text }}>${position.entryPrice.toFixed(1)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-white/30">Mark</span>
-          <span className="text-white/70">${position.currentPrice.toFixed(1)}</span>
+          <span style={{ color: theme.textMuted }}>Mark</span>
+          <span style={{ color: theme.text }}>${position.currentPrice.toFixed(1)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-red-400/50">SL</span>
@@ -60,9 +63,9 @@ export function PositionCard({ position, balance }: PositionCardProps) {
       </div>
 
       {/* Margin row */}
-      <div className="flex justify-between text-[10px] text-white/20 mt-2 pt-2 border-t border-white/5 font-mono">
+      <div className="flex justify-between text-[10px] mt-2 pt-2 font-mono" style={{ color: theme.textMuted, borderTop: `1px solid ${theme.textMuted}22` }}>
         <span>Margin ${position.margin.toFixed(2)}</span>
-        <span>Bal ${balance.toFixed(2)}</span>
+        <span>Binance ${balance.toFixed(2)}</span>
         <span>Size ${(position.margin * 5).toFixed(2)}</span>
       </div>
     </div>
