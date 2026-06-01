@@ -210,7 +210,7 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
 
     // Save user's scroll position (time + price) before data update
     const prevLogicalRange = chart?.timeScale().getVisibleLogicalRange()
-    const prevPriceRange = chart?.priceScale('right').getVisiblePriceRange()
+    const prevPriceRange = chart?.priceScale('right').getVisibleRange()
 
     const data = candles.map(candleToLw).sort((a, b) => Number(a.time) - Number(b.time))
     series.setData(data)
@@ -222,7 +222,7 @@ export function Chart({ candles, killZones, position, regime, srLevels, mcResult
 
     // Restore price scale — prevents auto-scale from snapping back
     if (prevPriceRange) {
-      chart?.priceScale('right').setVisiblePriceRange(prevPriceRange)
+      chart?.priceScale('right').setVisibleRange(prevPriceRange)
     }
   }, [candles])
 
