@@ -19,6 +19,7 @@ interface SignalState {
   alignmentScore: number
   directions: Record<string, string>
   session: string
+  bias: string
   lastUpdate: number
   connected: boolean
 }
@@ -37,6 +38,7 @@ export function useRegimeSignal(): SignalState {
     alignmentScore: 0,
     directions: {},
     session: '',
+    bias: 'watch-only',
     lastUpdate: Date.now(),
     connected: false,
   })
@@ -65,6 +67,7 @@ export function useRegimeSignal(): SignalState {
             alignmentScore: signal.alignmentScore,
             directions: signal.directions,
             session: signal.session,
+            bias: signal.bias || 'watch-only',
             lastUpdate: signal.timestamp,
             connected: true,
           })

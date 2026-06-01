@@ -12,6 +12,8 @@ export interface KillZone {
   start: number
   end: number
   color: string
+  high?: number
+  low?: number
 }
 
 export interface Position {
@@ -66,5 +68,32 @@ export interface StrategyTrade {
   tradeId: number
 }
 
+export interface SRLevel {
+  price: number
+  type: 'support' | 'resistance'
+  strength: number
+}
+
 export type Regime = 'bullish' | 'bearish' | 'sideways'
 export type TradeMode = 'strategy' | 'touch'
+
+export interface SRLevel {
+  price: number
+  type: 'support' | 'resistance'
+  strength: number
+}
+
+export interface MCResult {
+  median: number[]
+  lower25: number[]
+  upper75: number[]
+  lower10: number[]
+  upper90: number[]
+  nSteps: number
+  probUp: number
+  expectedClose: number
+  seedPrice: number
+  sigma: number
+  annVol: number
+  mu: number
+}

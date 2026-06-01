@@ -3,6 +3,7 @@ import type { Position, Regime, TradeRecord, TradeCloseReason } from '../types'
 
 const INITIAL_BALANCE = 12.94 // USDT — matches Binance Futures wallet
 const STORAGE_KEY = 'flappy-trade-history'
+const HIGH_SCORE_KEY = 'flappy-high-score'
 
 function loadHistory(): TradeRecord[] {
   try {
@@ -17,11 +18,24 @@ function saveHistory(trades: TradeRecord[]) {
   } catch {}
 }
 
+function loadHighScore(): number {
+  try {
+    const raw = localStorage.getItem(HIGH_SCORE_KEY)
+    return raw ? parseFloat(raw) : INITIAL_BALANCE
+  } catch { return INITIAL_BALANCE }
+}
+
+function saveHighScore(score: number) {
+  try {
+    localStorage.setItem(HIGH_SCORE_KEY, String(score))
+  } catch {}
+}
+
 export function useTrade() {
   const [position, setPosition] = useState<Position | null>(null)
   const [balance, setBalance] = useState(INITIAL_BALANCE)
   const [liquidated, setLiquidated] = useState(false)
-  const [highScore, setHighScore] = useState(INITIAL_BALANCE)
+  const [highScore, setHighScore] = useState(loadHighScore)
   const [trades, setTrades] = useState<TradeRecord[]>(loadHistory)
   const entryTimeRef = useRef<number>(0)
   const tradeIdCounter = useRef(trades.length)
@@ -77,7 +91,10 @@ export function useTrade() {
       : (position.entryPrice - price) / position.entryPrice * position.margin * 5
     const newBalance = balance + pnlRaw
     setBalance(newBalance)
-    if (newBalance > highScore) setHighScore(newBalance)
+    if (newBalance > highScore) {
+      setHighScore(newBalance)
+      saveHighScore(newBalance)
+    }
     if (newBalance <= 0) setLiquidated(true)
     recordClose(price, pnlRaw, newBalance, 'tap')
     setPosition(null)
@@ -106,7 +123,10 @@ export function useTrade() {
       const profit = position.margin * 0.015 * 5
       const newBalance = balance + profit
       setBalance(newBalance)
-      if (newBalance > highScore) setHighScore(newBalance)
+      if (newBalance > highScore) {
+        setHighScore(newBalance)
+        saveHighScore(newBalance)
+      }
       recordClose(price, profit, newBalance, 'tp')
       setPosition(null)
       return
@@ -132,7 +152,7 @@ export function useTrade() {
 
   const restart = useCallback(() => {
     setBalance(INITIAL_BALANCE)
-    setHighScore(INITIAL_BALANCE)
+    setHighScore(loadHighScore())
     setLiquidated(false)
     setPosition(null)
   }, [])

@@ -12,6 +12,12 @@
     <title>Flappy Trade</title>
   </head>
   <body>
+    <script>
+      // Kill any previously registered service worker on first load
+      navigator.serviceWorker?.getRegistrations().then(regs => {
+        for (const r of regs) r.unregister()
+      })
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

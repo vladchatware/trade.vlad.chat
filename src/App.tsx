@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Chart } from './components/Chart'
 import { TradeOverlay } from './components/TradeOverlay'
 import { StartPauseButton } from './components/StartPauseButton'
@@ -6,22 +6,31 @@ import { PositionCard } from './components/PositionCard'
 import { LiquidationScreen } from './components/LiquidationScreen'
 import { TradeHistory } from './components/TradeHistory'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SignalDisplay } from './components/SignalDisplay'
 import { useCandleStream } from './hooks/useCandleStream'
 import { useRegimeSignal } from './hooks/useRegimeSignal'
 import { useTrade } from './hooks/useTrade'
 import { useTradeStream } from './hooks/useTradeStream'
+import { useSound } from './hooks/useSound'
+import { useSRLevels } from './hooks/useSRLevels'
+import { useMonteCarlo } from './hooks/useMonteCarlo'
 import { getActiveKillZones } from './lib/killZones'
 import type { KillZone, Regime } from './types'
 
 export default function App() {
   const [isRunning, setIsRunning] = useState(false)
+  const [tf, setTf] = useState<'5m' | '15m'>('5m')
   const signal = useRegimeSignal()
   const [killZones, setKillZones] = useState<KillZone[]>([])
-  // regime comes from the relay WebSocket; falls back to 'sideways' before first signal
   const regime: Regime = signal.regime
-  const candles = useCandleStream('btcusdt', '5m')
+  const candles = useCandleStream('btcusdt', tf)
+  const srLevels = useSRLevels(candles)
+  const mcResult = useMonteCarlo(candles)
   const { position, balance, highScore, liquidated, trades, handleTap, updatePrice, restart } = useTrade()
   const strategyTrades = useTradeStream()
+  const sound = useSound()
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const prevPosRef = useRef(position)
 
   useEffect(() => {
     setKillZones(getActiveKillZones())
@@ -31,6 +40,52 @@ export default function App() {
     return () => clearInterval(interval)
   }, [])
 
+  // Enrich kill zones with session high/low from candle data
+  const killZonesWithHL = useMemo(() =>
+    killZones.map(zone => {
+      if (candles.length === 0) return zone
+      const zoneCandles = candles.filter(c => c.time >= zone.start && c.time < zone.end)
+      if (zoneCandles.length === 0) return zone
+      return {
+        ...zone,
+        high: Math.max(...zoneCandles.map(c => c.high)),
+        low: Math.min(...zoneCandles.map(c => c.low)),
+      }
+    }),
+    [killZones, candles]
+  )
+
+  // Filter S/R by bias: bearish → nearest resistances above, bullish → nearest supports below
+  const filteredSr = useMemo(() => {
+    if (srLevels.length === 0 || candles.length === 0) return srLevels
+    const currentPrice = candles[candles.length - 1].close
+    const bias = signal.bias
+
+    if (bias === 'short' || signal.rawRegime?.toLowerCase().includes('down')) {
+      // Bearish: closest resistances above price
+      return srLevels
+        .filter(l => l.type === 'resistance' && l.price > currentPrice)
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 2)
+    } else if (bias === 'long' || signal.rawRegime?.toLowerCase().includes('up')) {
+      // Bullish: closest supports below price
+      return srLevels
+        .filter(l => l.type === 'support' && l.price < currentPrice)
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 2)
+    }
+    // Watch-only / sideways: show closest level above (resistance) and below (support)
+    const rAbove = srLevels
+      .filter(l => l.type === 'resistance' && l.price > currentPrice)
+      .sort((a, b) => a.price - b.price)
+      .slice(0, 1)
+    const sBelow = srLevels
+      .filter(l => l.type === 'support' && l.price < currentPrice)
+      .sort((a, b) => b.price - a.price)
+      .slice(0, 1)
+    return [...sBelow, ...rAbove]
+  }, [srLevels, signal.bias, signal.rawRegime, candles])
+
   // Update unrealized PnL and auto-trigger SL/TP on each new candle
   useEffect(() => {
     if (candles.length > 0 && position) {
@@ -38,8 +93,35 @@ export default function App() {
     }
   }, [candles, position?.entryPrice])
 
+  // Sound effects on trade events
+  useEffect(() => {
+    if (trades.length === 0) return
+    const lastTrade = trades[0]
+    switch (lastTrade.reason) {
+      case 'sl': sound.play('sl'); break
+      case 'tp': sound.play('tp'); break
+      case 'tap':
+        if (lastTrade.side) sound.play('close')
+        break
+    }
+  }, [trades.length])
+
+  // Liquidation sound
+  useEffect(() => {
+    if (liquidated) sound.play('liquidation')
+  }, [liquidated])
+
+  // Open sound — when a new position appears
+  useEffect(() => {
+    if (position && !prevPosRef.current) {
+      sound.play('open')
+    }
+    prevPosRef.current = position
+  }, [position])
+
   const onTap = () => {
     if (candles.length === 0 || !isRunning || liquidated) return
+    sound.init() // Ensure AudioContext is unlocked (Safari/iOS requirement)
     handleTap(candles[candles.length - 1].close, regime)
   }
 
@@ -57,10 +139,22 @@ export default function App() {
         </div>
       </div>
 
+      {/* Signal banner — the core of the game */}
+      <SignalDisplay
+        bias={signal.bias}
+        regime={regime}
+        rawRegime={signal.rawRegime}
+        session={signal.session}
+        directions={signal.directions}
+        alignmentScore={signal.alignmentScore}
+        connected={signal.connected}
+        mcResult={mcResult}
+      />
+
       {/* Chart — full screen, edge to edge */}
       <div className="absolute inset-0">
         <ErrorBoundary>
-          <Chart candles={candles} killZones={killZones} position={position} regime={regime} />
+          <Chart candles={candles} killZones={killZonesWithHL} position={position} regime={regime} srLevels={filteredSr} mcResult={mcResult} />
         </ErrorBoundary>
       </div>
 
@@ -84,14 +178,31 @@ export default function App() {
       {/* Trade history toggle — merge PWA + strategy trades */}
       <TradeHistory trades={[...trades, ...strategyTrades]} />
 
-      {/* Bottom bar: Start/Pause + signal status */}
-      <div className="absolute bottom-3 left-4 right-4 z-20 flex justify-center">
+      {/* Bottom bar: Start/Pause + controls */}
+      <div className="absolute bottom-3 left-4 right-4 z-20 flex flex-col items-center gap-2">
+        {/* Timeframe + Sound controls */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setTf(tf === '5m' ? '15m' : '5m')}
+            className="px-2 py-0.5 text-[10px] font-mono rounded-full border border-white/10 text-white/30 hover:text-white/60 hover:border-white/30 transition-colors uppercase tracking-wider"
+          >
+            {tf}
+          </button>
+          <button
+            onClick={() => { const v = sound.toggle(); setSoundEnabled(v); }}
+            className={`px-2 py-0.5 text-[10px] rounded-full border transition-all ${
+              soundEnabled
+                ? 'border-white/30 text-white/60'
+                : 'border-white/10 text-white/20'
+            }`}
+            title={soundEnabled ? 'Mute' : 'Unmute'}
+          >
+            ♪
+          </button>
+        </div>
         <StartPauseButton
           isRunning={isRunning}
           onToggle={() => setIsRunning(r => !r)}
-          signalConnected={signal.connected}
-          regime={regime}
-          alignmentScore={signal.alignmentScore}
         />
       </div>
     </div>

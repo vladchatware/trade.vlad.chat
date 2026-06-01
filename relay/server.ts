@@ -15,9 +15,41 @@ import { readSignal, type CompSignal } from "./lib/signalReader.ts";
 // ── Config ──
 const PORT = 3002;
 const FETCH_INTERVAL_MS = 60_000; // 1 minute between refreshes
-const SESSION = "Asia";
 const BIAS = "watch-only";
 const SYMBOL = "BTCUSDT";
+
+// ── Session detection ──
+interface SessionDef { label: string; startH: number; startM: number; endH: number; endM: number; }
+const SESSIONS: SessionDef[] = [
+  { label: 'Asia',   startH: 0,  startM: 0,  endH: 4,  endM: 0  },
+  { label: 'London', startH: 6,  startM: 0,  endH: 9,  endM: 0  },
+  { label: 'NY AM',  startH: 13, startM: 30, endH: 15, endM: 0  },
+  { label: 'NY Ln',  startH: 16, startM: 0,  endH: 17, endM: 0  },
+  { label: 'NY PM',  startH: 17, startM: 30, endH: 20, endM: 0  },
+];
+
+function getCurrentSession(): string {
+  const now = new Date();
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  // Active session
+  for (const s of SESSIONS) {
+    const start = s.startH * 60 + s.startM;
+    const end = s.endH * 60 + s.endM;
+    if (utcMinutes >= start && utcMinutes < end) return s.label;
+  }
+  // Between sessions — return upcoming
+  let upcoming = SESSIONS[0].label;
+  let upcomingStart = Infinity;
+  for (const s of SESSIONS) {
+    const start = s.startH * 60 + s.startM;
+    if (start < utcMinutes) continue; // already passed
+    if (start < upcomingStart) {
+      upcomingStart = start;
+      upcoming = s.label;
+    }
+  }
+  return upcoming;
+}
 
 // ── Types ──
 interface WsClient {
@@ -52,7 +84,8 @@ function broadcast(message: string) {
 // ── Signal fetch loop ──
 async function fetchAndBroadcast() {
   try {
-    const signal = await readSignal(SESSION, BIAS, SYMBOL);
+    const session = getCurrentSession();
+    const signal = await readSignal(session, BIAS, SYMBOL);
     latestSignal = signal;
 
     const payload = JSON.stringify({

@@ -76,7 +76,7 @@ const LISTEN_KEY_RENEW_INTERVAL = 30 * 60 * 1000  // 30 min
 const clients = new Set<WebSocket>()
 
 // Candle history buffer for snapshot on client connect
-const MAX_HISTORY = 120
+const MAX_HISTORY = 500
 const candleHistory: Candle[] = []
 
 function broadcast(message: string): void {
@@ -224,7 +224,7 @@ let reconnectTimer: Timer | null = null
 async function backfillKlines(): Promise<void> {
   try {
     const res = await fetch(
-      'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=120',
+      'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=500',
     )
     if (!res.ok) {
       console.error(`[relay] kline backfill failed (${res.status})`)
